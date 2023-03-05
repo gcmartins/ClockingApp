@@ -32,19 +32,26 @@ def get_today_worked_hours():
     today = datetime.date.today()
     today_data = df[df["Date"] == today]
     if len(today_data) == 0:
-        return 0
+        return datetime.timedelta(0)
     elif len(today_data) == 1 and pd.isna(today_data["Check Out"].iloc[0]):
-        return 0
+        return datetime.timedelta(0)
     else:
         today_data["Duration"] = today_data["Check Out"] - today_data["Check In"]
-        todays_hours = today_data["Duration"].sum().total_seconds() / 3600
+        todays_hours = today_data["Duration"].sum()
         return todays_hours
+
+
+def format_timedelta(td):
+    seconds = td.seconds
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
 
 
 def warn_if_overtime():
     todays_hours = get_today_worked_hours()
-    if todays_hours >= 8:
-        print("Warning: You have worked {} hours today.".format(todays_hours))
+    if todays_hours >= datetime.timedelta(hours=8):
+        print("Warning: You have worked {} today.".format(format_timedelta(todays_hours)))
 
 
 def main():
@@ -71,7 +78,7 @@ def main():
             continue
 
         todays_hours = get_today_worked_hours()
-        print("Total worked hours today: {:.2f}".format(todays_hours))
+        print("Total worked hours today: {}".format(format_timedelta(todays_hours)))
         warn_if_overtime()
 
 
