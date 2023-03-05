@@ -6,13 +6,13 @@ filename = 'work_hours.csv'
 header = ["Date", "Check In", "Check Out"]
 
 
-def record_check_in():
+def record_check_in() -> None:
     with open(filename, "a") as f:
         current_time = datetime.datetime.now()
         f.write("{},{},{}\n".format(current_time.date(), current_time.time(), ""))
 
 
-def record_check_out():
+def record_check_out() -> None:
     with open(filename, "r+") as f:
         lines = f.readlines()
         if len(lines) == 0:
@@ -27,7 +27,7 @@ def record_check_out():
             return
 
 
-def get_today_worked_hours():
+def get_today_worked_hours() -> datetime.timedelta:
     df = pd.read_csv(filename, parse_dates=["Check In", "Check Out"])
     today = datetime.date.today()
     today_data = df[df["Date"] == today]
@@ -41,20 +41,20 @@ def get_today_worked_hours():
         return todays_hours
 
 
-def format_timedelta(td):
+def format_timedelta(td: datetime.timedelta) -> str:
     seconds = td.seconds
     hours, remainder = divmod(seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
 
 
-def warn_if_overtime():
+def warn_if_overtime() -> None:
     todays_hours = get_today_worked_hours()
     if todays_hours >= datetime.timedelta(hours=8):
         print("Warning: You have worked {} today.".format(format_timedelta(todays_hours)))
 
 
-def main():
+def main() -> None:
     if not os.path.isfile(filename):
         with open(filename, "w") as f:
             f.write(','.join(header) + '\n')
