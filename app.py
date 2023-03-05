@@ -1,7 +1,10 @@
 import datetime
 import pandas as pd
 import os.path
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSystemTrayIcon, \
+    QMenu, QAction
 from PyQt5.QtCore import QTimer
 
 filename = 'work_hours.csv'
@@ -20,7 +23,37 @@ class WorkHoursApp(QWidget):
         self.timer.timeout.connect(self.update_time)
         self.timer.start(1000)
         self._is_checked_out = True
+        self._overtime_message_showed = False
         self.get_today_worked_hours()
+
+        # Initialize tray icon
+        self.tray_icon = QSystemTrayIcon(self)
+        self.tray_icon.setIcon(QIcon('clock.png'))
+        self.tray_icon.setToolTip('Work Time Tracker')
+        self.tray_icon.activated.connect(self.tray_icon_activated)
+
+        # Create context menu for tray icon
+        self.tray_menu = QMenu()
+        open_action = QAction("Open", self)
+        open_action.triggered.connect(self.showNormal)
+        self.tray_menu.addAction(open_action)
+        exit_action = QAction("Exit", self)
+        exit_action.triggered.connect(QApplication.quit)
+        self.tray_menu.addAction(exit_action)
+
+        # Set context menu for tray icon
+        self.tray_icon.setContextMenu(self.tray_menu)
+
+        # Show tray icon
+        self.tray_icon.show()
+
+    def closeEvent(self, event):
+        event.ignore()
+        self.hide()
+
+    def tray_icon_activated(self, reason):
+        if reason == QSystemTrayIcon.Trigger:
+            self.showNormal()
 
     def setup_ui(self):
         self.setWindowTitle("Work Hours App")
@@ -107,6 +140,14 @@ class WorkHoursApp(QWidget):
         todays_hours = self.get_today_worked_hours()
         if todays_hours >= datetime.timedelta(hours=8):
             self.lbl_time.setStyleSheet("color: red")
+            if not self._overtime_message_showed:
+                self.tray_icon.showMessage(
+                    'Work Overtime',
+                    "Warning: You have worked {} today.".format(self.format_timedelta(todays_hours)),
+                    QSystemTrayIcon.Warning,
+                    3000
+                )
+                self._overtime_message_showed = True
         else:
             self.lbl_time.setStyleSheet("color: black")
 
