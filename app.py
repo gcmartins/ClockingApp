@@ -1,4 +1,6 @@
 import datetime
+from typing import Optional
+
 import pandas as pd
 import os.path
 
@@ -6,6 +8,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSystemTrayIcon, \
     QMenu, QAction
 from PyQt5.QtCore import QTimer
+from pandas import DataFrame
 
 filename = 'work_hours.csv'
 header = ["Date", "Check In", "Check Out"]
@@ -14,6 +17,10 @@ header = ["Date", "Check In", "Check Out"]
 class WorkHoursApp(QWidget):
     def __init__(self):
         super().__init__()
+        self._dataframe: Optional[DataFrame] = None
+        self.load_dataframe()
+        self._is_checked_out = True
+        self._overtime_message_showed = False
 
         self.timer = QTimer()
         self.worked_hours = datetime.timedelta(0)
@@ -22,14 +29,11 @@ class WorkHoursApp(QWidget):
 
         self.timer.timeout.connect(self.update_time)
         self.timer.start(1000)
-        self._is_checked_out = True
-        self._overtime_message_showed = False
-        self.get_today_worked_hours()
 
         # Initialize tray icon
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(QIcon('clock.png'))
-        self.tray_icon.setToolTip('Work Time Tracker')
+        self.tray_icon.setToolTip('WorkHoursApp')
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
         # Create context menu for tray icon
@@ -46,6 +50,9 @@ class WorkHoursApp(QWidget):
 
         # Show tray icon
         self.tray_icon.show()
+
+    def load_dataframe(self):
+        self._dataframe = pd.read_csv(filename, parse_dates=["Check In", "Check Out", "Date"])
 
     def closeEvent(self, event):
         event.ignore()
@@ -90,6 +97,7 @@ class WorkHoursApp(QWidget):
         with open(filename, "a") as f:
             current_time = datetime.datetime.now()
             f.write("{},{},{}\n".format(current_time.date(), current_time.time(), ""))
+        self.load_dataframe()
         self.update_buttons()
 
     def record_check_out(self):
@@ -105,6 +113,7 @@ class WorkHoursApp(QWidget):
                 f.writelines(lines)
             else:
                 return
+        self.load_dataframe()
         self.update_buttons()
 
     def update_time(self):
@@ -113,7 +122,9 @@ class WorkHoursApp(QWidget):
         self.warn_if_overtime()
 
     def get_today_worked_hours(self) -> datetime.timedelta:
-        df = pd.read_csv(filename, parse_dates=["Check In", "Check Out", "Date"])
+        df = self._dataframe
+        if len(df) == 0:
+            return datetime.timedelta(0)
         today = datetime.date.today()
         today_data = df[(df["Date"].dt.date == today) & (pd.isna(df['Check Out']) == False)]
         duration = today_data["Check Out"] - today_data["Check In"]
@@ -121,9 +132,7 @@ class WorkHoursApp(QWidget):
 
         nan_check_out = df[pd.isna(df['Check Out'])]
         self._is_checked_out = True
-        if len(today_data) == 0:
-            return datetime.timedelta(0)
-        elif not nan_check_out.empty:
+        if not nan_check_out.empty:
             self._is_checked_out = False
             not_completed_hours = datetime.datetime.now() - nan_check_out["Check In"].iloc[0]
             return todays_hours + not_completed_hours
@@ -141,15 +150,17 @@ class WorkHoursApp(QWidget):
         if todays_hours >= datetime.timedelta(hours=8):
             self.lbl_time.setStyleSheet("color: red")
             if not self._overtime_message_showed:
-                self.tray_icon.showMessage(
-                    'Work Overtime',
-                    "Warning: You have worked {} today.".format(self.format_timedelta(todays_hours)),
-                    QSystemTrayIcon.Warning,
-                    3000
-                )
+                self.show_overtime_message(todays_hours)
                 self._overtime_message_showed = True
         else:
             self.lbl_time.setStyleSheet("color: black")
+
+    def show_overtime_message(self, todays_hours):
+        self.tray_icon.showMessage(
+            'Work Overtime',
+            "You have worked {} today.".format(self.format_timedelta(todays_hours)),
+            QSystemTrayIcon.Warning,
+        )
 
 
 if __name__ == '__main__':
