@@ -10,7 +10,8 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLa
 from PyQt5.QtCore import QTimer
 from pandas import DataFrame
 
-filename = 'work_hours.csv'
+task_csv = 'task.csv'
+clocking_csv = 'work_hours.csv'
 header = ["Date", "Check In", "Check Out"]
 
 
@@ -51,12 +52,12 @@ class WorkHoursApp(QWidget):
         # Show tray icon
         self.tray_icon.show()
 
-    def load_dataframe(self):
-        self._dataframe = pd.read_csv(filename, parse_dates=["Check In", "Check Out", "Date"])
-
     def closeEvent(self, event):
         event.ignore()
         self.hide()
+
+    def load_dataframe(self):
+        self._dataframe = pd.read_csv(clocking_csv, parse_dates=["Check In", "Check Out", "Date"])
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
@@ -64,16 +65,17 @@ class WorkHoursApp(QWidget):
 
     def setup_ui(self):
         self.setWindowTitle("Work Hours App")
+        self.setMinimumSize(200, 200)
 
         self.lbl_time = QLabel(self.format_timedelta(self.worked_hours))
         self.btn_check_in = QPushButton("Check In")
-        self.btn_check_out = QPushButton("Check Out")
+        self.btn_stop = QPushButton("STOP")
 
         self.update_buttons()
 
         hbox = QHBoxLayout()
         hbox.addWidget(self.btn_check_in)
-        hbox.addWidget(self.btn_check_out)
+        hbox.addWidget(self.btn_stop)
 
         vbox = QVBoxLayout()
         vbox.addWidget(self.lbl_time)
@@ -82,26 +84,26 @@ class WorkHoursApp(QWidget):
         self.setLayout(vbox)
 
         self.btn_check_in.clicked.connect(self.record_check_in)
-        self.btn_check_out.clicked.connect(self.record_check_out)
+        self.btn_stop.clicked.connect(self.record_check_out)
 
     def update_buttons(self):
         self.get_today_worked_hours()
         if self._is_checked_out:
             self.btn_check_in.setEnabled(True)
-            self.btn_check_out.setEnabled(False)
+            self.btn_stop.setEnabled(False)
         else:
             self.btn_check_in.setEnabled(False)
-            self.btn_check_out.setEnabled(True)
+            self.btn_stop.setEnabled(True)
 
     def record_check_in(self):
-        with open(filename, "a") as f:
+        with open(clocking_csv, "a") as f:
             current_time = datetime.datetime.now()
             f.write("{},{},{}\n".format(current_time.date(), current_time.time(), ""))
         self.load_dataframe()
         self.update_buttons()
 
     def record_check_out(self):
-        with open(filename, "r+") as f:
+        with open(clocking_csv, "r+") as f:
             lines = f.readlines()
             if len(lines) == 0:
                 return
@@ -164,8 +166,8 @@ class WorkHoursApp(QWidget):
 
 
 if __name__ == '__main__':
-    if not os.path.isfile(filename):
-        with open(filename, "w") as f:
+    if not os.path.isfile(clocking_csv):
+        with open(clocking_csv, "w") as f:
             f.write(','.join(header) + '\n')
     app = QApplication([])
     widget = WorkHoursApp()
