@@ -21,12 +21,13 @@ class TaskUI:
         self.description = description
         self.button = button
         self.button.setToolTip(self.description)
-        self.duration: datetime.timedelta = datetime.timedelta(0)
+        self.label = QLabel(format_timedelta(datetime.timedelta(0)))
 
 
 class WorkHoursApp(QWidget):
     def __init__(self):
         super().__init__()
+        self.todays_clocking_label = None
         self.started_task_id: Optional[str] = None
         self._dataframe: Optional[DataFrame] = None
         self.load_dataframe()
@@ -77,16 +78,19 @@ class WorkHoursApp(QWidget):
         self.setWindowTitle("Work Hours App")
         self.setMinimumSize(200, 200)
 
-        self.lbl_time = QLabel(self.format_timedelta(self.worked_hours))
+        self.todays_clocking_label = QLabel(format_timedelta(self.worked_hours))
         self.create_task_buttons()
         self.btn_stop = QPushButton("STOP")
 
         self.update_buttons()
 
         vbox = QVBoxLayout()
-        vbox.addWidget(self.lbl_time)
+        vbox.addWidget(self.todays_clocking_label)
         for _, task in self.task_buttons.items():
-            vbox.addWidget(task.button)
+            hbox = QHBoxLayout()
+            hbox.addWidget(task.button)
+            hbox.addWidget(task.label)
+            vbox.addLayout(hbox)
         vbox.addWidget(self.btn_stop)
 
         self.setLayout(vbox)
@@ -139,7 +143,7 @@ class WorkHoursApp(QWidget):
 
     def update_time(self):
         self.worked_hours = self.get_today_worked_hours()
-        self.lbl_time.setText(self.format_timedelta(self.worked_hours))
+        self.todays_clocking_label.setText(format_timedelta(self.worked_hours))
         self.warn_if_overtime()
 
     def get_today_worked_hours(self) -> datetime.timedelta:
@@ -161,28 +165,29 @@ class WorkHoursApp(QWidget):
         else:
             return todays_hours
 
-    def format_timedelta(self, td: datetime.timedelta) -> str:
-        seconds = td.seconds
-        hours, remainder = divmod(seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
-
     def warn_if_overtime(self) -> None:
         todays_hours = self.get_today_worked_hours()
         if todays_hours >= datetime.timedelta(hours=8):
-            self.lbl_time.setStyleSheet("color: red")
+            self.todays_clocking_label.setStyleSheet("color: red")
             if not self._overtime_message_showed:
                 self.show_overtime_message(todays_hours)
                 self._overtime_message_showed = True
         else:
-            self.lbl_time.setStyleSheet("color: black")
+            self.todays_clocking_label.setStyleSheet("color: black")
 
     def show_overtime_message(self, todays_hours):
         self.tray_icon.showMessage(
             'Work Overtime',
-            "You have worked {} today.".format(self.format_timedelta(todays_hours)),
+            "You have worked {} today.".format(format_timedelta(todays_hours)),
             QSystemTrayIcon.Warning,
         )
+        
+        
+def format_timedelta(td: datetime.timedelta) -> str:
+    seconds = td.seconds
+    hours, remainder = divmod(seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
 
 
 if __name__ == '__main__':
