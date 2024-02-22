@@ -89,7 +89,7 @@ class WorkHoursApp(QWidget):
         for _, task in self.task_buttons.items():
             hbox = QHBoxLayout()
             hbox.addWidget(task.button)
-            hbox.addWidget(task.label)
+            # hbox.addWidget(task.label)
             vbox.addLayout(hbox)
         vbox.addWidget(self.btn_stop)
 
@@ -119,7 +119,7 @@ class WorkHoursApp(QWidget):
                 self.record_check_out()
             with open(clocking_csv, "a") as f:
                 current_time = datetime.datetime.now()
-                f.write("{},{},{},\n".format(current_time.date(), task_id, current_time.time().strftime("%H:%M:%S")))
+                f.write("{},{},{},\n".format(current_time.date(), task_id, current_time.time().strftime("%H:%M")))
             self.load_dataframe()
             self.started_task_id = task_id
             self.update_buttons()
@@ -132,7 +132,7 @@ class WorkHoursApp(QWidget):
                 return
             last_line = lines[-1].rstrip('\n').split(',')
             if len(last_line) == 4 and last_line[3] == '':
-                last_line[3] = str(datetime.datetime.now().time().strftime("%H:%M:%S"))
+                last_line[3] = str(datetime.datetime.now().time().strftime("%H:%M"))
                 lines[-1] = ','.join(last_line) + '\n'
                 f.seek(0)
                 f.writelines(lines)
