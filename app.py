@@ -10,6 +10,9 @@ from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLa
 from PyQt5.QtCore import QTimer
 from pandas import DataFrame
 
+from check_clockings import CheckClocking
+from util import format_timedelta
+
 task_csv = 'task.csv'
 clocking_csv = 'work_hours.csv'
 header = ["Date", "Task", "Check In", "Check Out"]
@@ -20,8 +23,8 @@ class TaskUI:
         self.id = id
         self.description = description
         self.button = button
-        self.button.setToolTip(self.description)
-        self.label = QLabel(format_timedelta(datetime.timedelta(0)))
+        # self.button.setToolTip(self.description)
+        self.label = QLabel(self.description)
 
 
 class WorkHoursApp(QWidget):
@@ -53,6 +56,9 @@ class WorkHoursApp(QWidget):
         open_action = QAction("Open", self)
         open_action.triggered.connect(self.showNormal)
         self.tray_menu.addAction(open_action)
+        check_clocking_action = QAction("Check Clocking", self)
+        check_clocking_action.triggered.connect(self.open_check_clocking)
+        self.tray_menu.addAction(check_clocking_action)
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(QApplication.quit)
         self.tray_menu.addAction(exit_action)
@@ -62,6 +68,10 @@ class WorkHoursApp(QWidget):
 
         # Show tray icon
         self.tray_icon.show()
+
+    def open_check_clocking(self):
+        self.check_clocking_window = CheckClocking(self._dataframe)
+        self.check_clocking_window.show()
 
     def closeEvent(self, event):
         event.ignore()
@@ -89,7 +99,7 @@ class WorkHoursApp(QWidget):
         for _, task in self.task_buttons.items():
             hbox = QHBoxLayout()
             hbox.addWidget(task.button)
-            # hbox.addWidget(task.label)
+            hbox.addWidget(task.label)
             vbox.addLayout(hbox)
         vbox.addWidget(self.btn_stop)
 
@@ -103,6 +113,7 @@ class WorkHoursApp(QWidget):
         for _, task in task_df.iterrows():
             task_id = task['Task']
             btn_check_in = QPushButton(task_id)
+            btn_check_in.setFixedWidth(100)
             btn_check_in.clicked.connect(self.record_check_in(task_id))
             self.task_buttons[task_id] = TaskUI(task_id, task['Description'], btn_check_in)
 
@@ -181,13 +192,6 @@ class WorkHoursApp(QWidget):
             "You have worked {} today.".format(format_timedelta(todays_hours)),
             QSystemTrayIcon.Warning,
         )
-        
-        
-def format_timedelta(td: datetime.timedelta) -> str:
-    seconds = td.seconds
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
 
 
 if __name__ == '__main__':
