@@ -35,24 +35,9 @@ def format_timedelta_jira(td: datetime.timedelta) -> str:
     return "{:02d}h {:02d}m".format(hours, minutes)
 
 
-def push_worklog_to_jira(issue_key, start_datetime, end_datetime, comment):
+def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, duration: datetime.timedelta) -> bool:
     payload = json.dumps({
-        'timeSpentSeconds': (end_datetime - start_datetime).total_seconds(),
-        'comment': {
-            'type': 'doc',
-            'version': 1,
-            'content': [
-                {
-                    'type': 'paragraph',
-                    'content': [
-                        {
-                            'text': comment,
-                            'type': 'text'
-                        }
-                    ]
-                }
-            ]
-        },
+        'timeSpentSeconds': duration.total_seconds(),
         'started': start_datetime.strftime("%Y-%m-%dT%H:%M:%S.000+0000")
     })
 
