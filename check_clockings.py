@@ -14,7 +14,7 @@ class CheckClocking(QWidget):
     def __init__(self, dataframe):
         super().__init__()
         self._dataframe = dataframe
-        self.setWindowTitle("Check Clocking")
+        self.setWindowTitle("Clocking Summary")
         self.setMinimumSize(200, 200)
 
         today = datetime.date.today()
@@ -74,15 +74,14 @@ class CheckClocking(QWidget):
         if len(task_duration) == 0:
             return None
 
-        task_day = {}
-        task_day['date'] = '{}'.format(day)
+        task_day = {'date': '{}'.format(day)}
         task_string = ''
         for task, duration in zip(task_duration.index, task_duration):
             task_string += '{} -- {}<br>'.format(task, format_timedelta_jira(duration))
 
         task_day['clockings'] = task_string
 
-        task_day['total'] = '{} -- {}<br>'.format('Total', format_timedelta(task_duration.sum()))
+        task_day['total'] = 'Total -- {}<br>'.format(format_timedelta(task_duration.sum()))
 
         return task_day
 

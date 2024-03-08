@@ -56,7 +56,7 @@ class WorkHoursApp(QWidget):
         open_action = QAction("Open", self)
         open_action.triggered.connect(self.showNormal)
         self.tray_menu.addAction(open_action)
-        check_clocking_action = QAction("Check Clocking", self)
+        check_clocking_action = QAction("Clocking Summary", self)
         check_clocking_action.triggered.connect(self.open_check_clocking)
         self.tray_menu.addAction(check_clocking_action)
         exit_action = QAction("Exit", self)
