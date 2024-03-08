@@ -143,8 +143,18 @@ class WorkHoursApp(QWidget):
                 return
             last_line = lines[-1].rstrip('\n').split(',')
             if len(last_line) == 4 and last_line[3] == '':
-                last_line[3] = str(datetime.datetime.now().time().strftime("%H:%M"))
-                lines[-1] = ','.join(last_line) + '\n'
+                started_date = last_line[0]
+                now_datetime = datetime.datetime.now()
+                end_date = now_datetime.date().isoformat()
+                end_time = now_datetime.time().strftime("%H:%M")
+                if started_date == end_date:
+                    last_line[3] = end_time
+                    lines[-1] = ','.join(last_line) + '\n'
+                else:
+                    last_line[3] = '23:59'
+                    lines[-1] = ','.join(last_line) + '\n'
+                    task_key = last_line[1]
+                    lines.append(f'{end_date},{task_key},00:00,{end_time}\n')
                 f.seek(0)
                 f.writelines(lines)
             else:
