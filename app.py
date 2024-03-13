@@ -4,9 +4,9 @@ from typing import Optional
 import pandas as pd
 import os.path
 
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSystemTrayIcon, \
-    QMenu, QAction
+    QMenu, QAction, QPlainTextEdit
 from PyQt5.QtCore import QTimer
 from pandas import DataFrame
 
@@ -103,9 +103,33 @@ class WorkHoursApp(QWidget):
             vbox.addLayout(hbox)
         vbox.addWidget(self.btn_stop)
 
+        self.csv_text = QPlainTextEdit()
+        self.update_csv_text()
+        self.save_csv_btn = QPushButton("Update CSV")
+        self.save_csv_btn.clicked.connect(self.save_csv_file)
+        vbox.addWidget(self.csv_text)
+        vbox.addWidget(self.save_csv_btn)
+
         self.setLayout(vbox)
 
         self.btn_stop.clicked.connect(self.record_check_out)
+
+    def get_csv_text_from_file(self) -> str:
+        with open(CLOCKING_CSV, "r") as f:
+            return f.read()
+
+    def save_csv_file(self):
+        with open(CLOCKING_CSV, "w") as f:
+            text = self.csv_text.toPlainText()
+            f.write(text)
+        self.load_dataframe()
+        self.update_buttons()
+
+    def update_csv_text(self):
+        self.csv_text.setPlainText(self.get_csv_text_from_file())
+        cursor = self.csv_text.textCursor()
+        cursor.movePosition(QTextCursor.End)
+        self.csv_text.setTextCursor(cursor)
 
     def create_task_buttons(self):
         task_df = pd.read_csv(task_csv, names=["Task", "Description"], header=0)
@@ -119,6 +143,8 @@ class WorkHoursApp(QWidget):
 
     def update_buttons(self):
         self.get_today_worked_hours()
+        for _, task in self.task_buttons.items():
+            task.button.setEnabled(True)
         if self.started_task_id:
             self.task_buttons[self.started_task_id].button.setEnabled(self._is_checked_out)
 
@@ -134,6 +160,7 @@ class WorkHoursApp(QWidget):
             self.load_dataframe()
             self.started_task_id = task_id
             self.update_buttons()
+            self.update_csv_text()
         return do_check_in
 
     def record_check_out(self):
@@ -161,6 +188,7 @@ class WorkHoursApp(QWidget):
                 return
         self.load_dataframe()
         self.update_buttons()
+        self.update_csv_text()
 
     def update_time(self):
         self.worked_hours = self.get_today_worked_hours()
