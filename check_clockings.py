@@ -48,7 +48,7 @@ class CheckClocking(QWidget):
         def do_push_to_jira():
             df = self._dataframe
             today_data = df[(df["Date"].dt.date == date) & (pd.isna(df['Check Out']) == False)]
-            self.log_text.setText('Pushing to Jira ...<br>')
+            self.log_text.setText(f'Pushing {day} clocking to Jira worklog ...')
             for _, data in today_data.iterrows():
                 task = data['Task']
                 start_datetime: datetime.datetime = data['Check In']
@@ -56,12 +56,13 @@ class CheckClocking(QWidget):
                 duration = end_datetime - start_datetime
                 start_datetime = datetime.datetime(date.year, date.month, date.day, start_datetime.hour, start_datetime.minute)
                 ok = push_worklog_to_jira(task, start_datetime, duration)
-                log_info = f'task: {task}, duration: {duration}, start: {start_datetime}'
+                log_info = f'Task: {task}, Duration: {format_timedelta_jira(duration)}'
                 log_status = 'Success' if ok else 'Fail'
                 log_color = 'blue' if ok else 'red'
-                text_logging = f'<span style=\"color:{log_color};\">{log_info} --> {log_status}</span><br>'
+                text_logging = f'<span style=\"color:{log_color};\">{log_info} --> {log_status}</span>'
                 self.log_text.append(text_logging)
                 QtGui.QGuiApplication.processEvents()
+            self.log_text.append(f'Done')
 
         return do_push_to_jira
 

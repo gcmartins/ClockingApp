@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+from typing import List
 
 import requests
 from dotenv import load_dotenv
@@ -19,6 +20,8 @@ POST_HEADERS = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
 }
+
+OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do']
 
 
 def format_timedelta(td: datetime.timedelta) -> str:
@@ -50,3 +53,22 @@ def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, dura
     )
 
     return response.ok
+
+def get_jira_open_issues() -> List[dict]:
+    user_name = os.getenv("JIRA_EMAIL")
+    response = requests.request(
+        'GET',
+        f'{JIRA_URL}/search?jql=assignee="{user_name}"',
+        headers=POST_HEADERS,
+        auth=AUTH
+    )
+    r = response.json()
+
+    open_issues = []
+    for issue in r['issues']:
+        status = issue['fields']['status']['name']
+        if status in OPEN_ISSUE_STATUS:
+            summary = issue['fields']['summary']
+            open_issues.append({'task': issue['key'], 'description': summary})
+
+    return open_issues

@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Optional, Callable
 
 import pandas as pd
 import os.path
@@ -11,11 +11,13 @@ from PyQt5.QtCore import QTimer
 from pandas import DataFrame
 
 from check_clockings import CheckClocking
-from util import format_timedelta
+from util import format_timedelta, get_jira_open_issues
 
-task_csv = 'task.csv'
-clocking_csv = 'work_hours.csv'
-header = ["Date", "Task", "Check In", "Check Out"]
+FIXED_TASK_CSV = 'fixed_tasks.csv'
+OPEN_TASK_CSV = 'open_tasks.csv'
+CLOCKING_CSV = 'work_hours.csv'
+CLOCKING_HEADER = ["Date", "Task", "Check In", "Check Out"]
+TASK_HEADER = ['Task', 'Description']
 
 
 class TaskUI:
@@ -28,6 +30,7 @@ class TaskUI:
 
 
 class WorkHoursApp(QWidget):
+    EXIT_CODE_REBOOT = 122
     def __init__(self):
         super().__init__()
         self.todays_clocking_label = None
@@ -59,6 +62,9 @@ class WorkHoursApp(QWidget):
         check_clocking_action = QAction("Clocking Summary", self)
         check_clocking_action.triggered.connect(self.open_check_clocking)
         self.tray_menu.addAction(check_clocking_action)
+        issues_action = QAction("Update Open Tasks", self)
+        issues_action.triggered.connect(self.update_open_tasks)
+        self.tray_menu.addAction(issues_action)
         exit_action = QAction("Exit", self)
         exit_action.triggered.connect(QApplication.quit)
         self.tray_menu.addAction(exit_action)
@@ -69,6 +75,18 @@ class WorkHoursApp(QWidget):
         # Show tray icon
         self.tray_icon.show()
 
+    def restart_app(self):
+        QApplication.exit(self.EXIT_CODE_REBOOT)
+
+    def update_open_tasks(self):
+        with open(OPEN_TASK_CSV, 'w') as f:
+            lines = [','.join(TASK_HEADER) + '\n']
+            for issue in get_jira_open_issues():
+                lines.append(f'{issue["task"]},{issue["description"]}\n')
+
+            f.writelines(lines)
+        self.restart_app()
+
     def open_check_clocking(self):
         self.check_clocking_window = CheckClocking(self._dataframe)
         self.check_clocking_window.show()
@@ -78,7 +96,7 @@ class WorkHoursApp(QWidget):
         self.hide()
 
     def load_dataframe(self):
-        self._dataframe = pd.read_csv(clocking_csv, parse_dates=["Date", "Check In", "Check Out"])
+        self._dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=["Date", "Check In", "Check Out"])
 
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
@@ -132,8 +150,12 @@ class WorkHoursApp(QWidget):
         self.csv_text.setTextCursor(cursor)
 
     def create_task_buttons(self):
-        task_df = pd.read_csv(task_csv, names=["Task", "Description"], header=0)
         self.task_buttons = {}
+        self.create_buttons_from_csv(OPEN_TASK_CSV)
+        self.create_buttons_from_csv(FIXED_TASK_CSV)
+
+    def create_buttons_from_csv(self, task_csv: str):
+        task_df = pd.read_csv(task_csv, names=["Task", "Description"], header=0)
         for _, task in task_df.iterrows():
             task_id = task['Task']
             btn_check_in = QPushButton(task_id)
@@ -150,11 +172,11 @@ class WorkHoursApp(QWidget):
 
         self.btn_stop.setEnabled(not self._is_checked_out)
 
-    def record_check_in(self, task_id: str):
+    def record_check_in(self, task_id: str) -> Callable:
         def do_check_in():
             if not self._is_checked_out:
                 self.record_check_out()
-            with open(clocking_csv, "a") as f:
+            with open(CLOCKING_CSV, "a") as f:
                 current_time = datetime.datetime.now()
                 f.write("{},{},{},\n".format(current_time.date(), task_id, current_time.time().strftime("%H:%M")))
             self.load_dataframe()
@@ -164,7 +186,7 @@ class WorkHoursApp(QWidget):
         return do_check_in
 
     def record_check_out(self):
-        with open(clocking_csv, "r+") as f:
+        with open(CLOCKING_CSV, "r+") as f:
             lines = f.readlines()
             if len(lines) == 0:
                 return
@@ -232,11 +254,24 @@ class WorkHoursApp(QWidget):
         )
 
 
+APP_FILE_HEADERS = {
+    CLOCKING_CSV: CLOCKING_HEADER,
+    FIXED_TASK_CSV: TASK_HEADER,
+    OPEN_TASK_CSV: TASK_HEADER,
+}
+
 if __name__ == '__main__':
-    if not os.path.isfile(clocking_csv):
-        with open(clocking_csv, "w") as f:
-            f.write(','.join(header) + '\n')
-    app = QApplication([])
-    widget = WorkHoursApp()
-    widget.show()
-    app.exec_()
+    for filename, header in APP_FILE_HEADERS.items():
+        if not os.path.isfile(filename):
+            with open(filename, "w") as f:
+                f.write(','.join(header) + '\n')
+                if filename == FIXED_TASK_CSV:
+                    f.write(f'TASK-KEY,Task description (you can change it by editing "{os.path.abspath(f.name)}" file)\n')
+
+    currentExitCode = WorkHoursApp.EXIT_CODE_REBOOT
+    while currentExitCode == WorkHoursApp.EXIT_CODE_REBOOT:
+        app = QApplication([])
+        widget = WorkHoursApp()
+        widget.show()
+        currentExitCode = app.exec_()
+        app = None  # delete the QApplication object
