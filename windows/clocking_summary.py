@@ -7,10 +7,11 @@ from PyQt5 import QtGui
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
 
-from util import format_timedelta, format_timedelta_jira, push_worklog_to_jira
+from services.utils import format_timedelta, format_timedelta_jira
+from services.jira_api import push_worklog_to_jira
 
 
-class CheckClocking(QWidget):
+class ClockingSummary(QWidget):
     def __init__(self, dataframe):
         super().__init__()
         self._dataframe = dataframe

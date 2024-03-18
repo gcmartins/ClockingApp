@@ -8,34 +8,17 @@ from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
 
 load_dotenv()
+
 AUTH = HTTPBasicAuth(os.getenv('JIRA_EMAIL'), os.getenv('JIRA_TOKEN'))
-
 JIRA_URL = f"{os.getenv('JIRA_URL')}/rest/api/3"
-
 GET_HEADERS = {
     'Accept': 'application/json'
 }
-
 POST_HEADERS = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
 }
-
 OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do']
-
-
-def format_timedelta(td: datetime.timedelta) -> str:
-    seconds = td.seconds
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return "{:02d}:{:02d}:{:02d}".format(hours, minutes, seconds)
-
-
-def format_timedelta_jira(td: datetime.timedelta) -> str:
-    seconds = td.seconds
-    hours, remainder = divmod(seconds, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return "{:02d}h {:02d}m".format(hours, minutes)
 
 
 def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, duration: datetime.timedelta) -> bool:
@@ -53,6 +36,7 @@ def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, dura
     )
 
     return response.ok
+
 
 def get_jira_open_issues() -> List[dict]:
     user_name = os.getenv("JIRA_EMAIL")
