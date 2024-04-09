@@ -1,11 +1,14 @@
 import datetime
 import json
 import os
+from functools import cache
 from typing import List
 
 import requests
 from dotenv import load_dotenv
 from requests.auth import HTTPBasicAuth
+
+from services.exceptions import ClockingException
 
 load_dotenv()
 
@@ -19,6 +22,17 @@ POST_HEADERS = {
     'Content-Type': 'application/json',
 }
 OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do']
+
+
+@cache
+def get_project_name(project_key: str) -> str:
+    response = requests.get(f'{JIRA_URL}/project/{project_key}', auth=AUTH)
+
+    if response.ok:
+        project_data = response.json()
+        return project_data.get('name')
+    else:
+        raise ClockingException('Failed to get Jira project name', response)
 
 
 def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, duration: datetime.timedelta) -> bool:
