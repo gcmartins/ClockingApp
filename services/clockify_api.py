@@ -11,22 +11,29 @@ from services.jira_api import get_project_name
 
 load_dotenv()
 
-CLOCKIFY_URL = f"https://api.clockify.me/api/v1/workspaces"
-CLOCKIFY_WORKSPACE = f"{os.getenv('CLOCKIFY_WORKSPACE')}"
 
-HEADERS = {
-    'content-type': 'application/json',
-    'X-Api-Key': f"{os.getenv('CLOCKIFY_API_KEY')}",
-}
+class ClockifyConfig:
+    def __init__(self, workspace, api_key):
+        self.url = "https://api.clockify.me/api/v1/workspaces"
+        self.workspace = workspace
+        self.api_key = api_key
 
-OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do']
+    @property
+    def headers(self):
+        return {
+            'content-type': 'application/json',
+            'X-Api-Key': self.api_key,
+        }
+
+
+_CONFIG = ClockifyConfig(os.getenv('CLOCKIFY_WORKSPACE'), os.getenv('CLOCKIFY_API_KEY'))
 
 
 @cache
 def find_clockify_project(project_name: str) -> str:
-    projects_url = f'{CLOCKIFY_URL}/{CLOCKIFY_WORKSPACE}/projects'
+    projects_url = f'{_CONFIG.url}/{_CONFIG.workspace}/projects'
     params = {'name': project_name, 'strict-name-search': True}
-    response = requests.get(projects_url, headers=HEADERS, params=params)
+    response = requests.get(projects_url, headers=_CONFIG.headers, params=params)
     projects = response.json()
 
     if not response.ok or len(projects) == 0:
@@ -37,16 +44,16 @@ def find_clockify_project(project_name: str) -> str:
 
 @cache
 def find_or_create_clockify_task(project_id: str, task_name: str) -> str:
-    tasks_url = f'{CLOCKIFY_URL}/{CLOCKIFY_WORKSPACE}/projects/{project_id}/tasks'
-    response = requests.get(tasks_url, headers=HEADERS)
+    tasks_url = f'{_CONFIG.url}/{_CONFIG.workspace}/projects/{project_id}/tasks'
+    params = {'name': task_name, 'strict-name-search': True}
+    response = requests.get(tasks_url, headers=_CONFIG.headers, params=params)
     tasks = response.json()
 
-    for task in tasks:
-        if task['name'] == task_name:
-            return task['id']
+    if len(tasks):
+        return tasks[0]['id']
 
     data = {'name': task_name}
-    response = requests.post(tasks_url, json=data, headers=HEADERS)
+    response = requests.post(tasks_url, json=data, headers=_CONFIG.headers)
 
     if not response.ok:
         raise ClockingException()
@@ -68,7 +75,7 @@ def log_time_in_clockify(
         start_time: datetime,
         end_time: datetime,
 ) -> bool:
-    url = f'{CLOCKIFY_URL}/{CLOCKIFY_WORKSPACE}/time-entries'
+    url = f'{_CONFIG.url}/{_CONFIG.workspace}/time-entries'
     data = {
         'start': convert_datetime_to_utc(start_time),
         'end': convert_datetime_to_utc(end_time),
@@ -77,7 +84,7 @@ def log_time_in_clockify(
         'projectId': project_id,
         'taskId': task_id,
     }
-    response = requests.post(url, json=data, headers=HEADERS)
+    response = requests.post(url, json=data, headers=_CONFIG.headers)
 
     return response.ok
 
