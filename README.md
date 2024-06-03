@@ -1,7 +1,7 @@
 Clocking App
 =====================
 
-# Introduction
+## Introduction
 
 This is a small desktop application to help register clocking into a CSV file with the following features:
 - Start, switch and stop clocking by click on Task buttons
@@ -33,4 +33,11 @@ To perform actions related to Jira, you need to create a `.env` file with your c
 JIRA_EMAIL=your@email.com
 JIRA_TOKEN=<YOUR JIRA TOKEN>
 JIRA_URL=https://yourcompany.atlassian.net
+```
+
+## Integration with Clockify
+To perform actions related to Clockify, you need to include the following credentials in the `.env` file as the example below: 
+```text
+CLOCKIFY_WORKSPACE=<YOUR CLOCKIFY WORKSPACE>
+CLOCKIFY_API_KEY=<YOUR CLOCKIFY API KEY>
 ```

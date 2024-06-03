@@ -7,6 +7,7 @@ from PyQt5 import QtGui
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
 
+from services.clockify_api import push_worklog_to_clockify
 from services.utils import format_timedelta, format_timedelta_jira
 from services.jira_api import push_worklog_to_jira
 
@@ -31,9 +32,15 @@ class ClockingSummary(QWidget):
             clockings = QTextEdit(task['clockings'])
             clockings.setReadOnly(True)
             vbox.addWidget(clockings)
+
+            buttons_layout = QHBoxLayout()
             jira_button = QPushButton('Push to JIRA')
             jira_button.clicked.connect(self.push_to_jira(task['date']))
-            vbox.addWidget(jira_button)
+            clockify_button = QPushButton('Push to Clockify')
+            clockify_button.clicked.connect(self.push_to_clockify(task['date']))
+            buttons_layout.addWidget(jira_button)
+            buttons_layout.addWidget(clockify_button)
+            vbox.addLayout(buttons_layout)
             vbox.addWidget(QLabel(task['total']), alignment=Qt.AlignBottom)
             hbox.addLayout(vbox)
 
@@ -57,15 +64,38 @@ class ClockingSummary(QWidget):
                 duration = end_datetime - start_datetime
                 start_datetime = datetime.datetime(date.year, date.month, date.day, start_datetime.hour, start_datetime.minute)
                 ok = push_worklog_to_jira(task, start_datetime, duration)
-                log_info = f'Task: {task}, Duration: {format_timedelta_jira(duration)}'
-                log_status = 'Success' if ok else 'Fail'
-                log_color = 'blue' if ok else 'red'
-                text_logging = f'<span style=\"color:{log_color};\">{log_info} --> {log_status}</span>'
-                self.log_text.append(text_logging)
-                QtGui.QGuiApplication.processEvents()
+                self.log_pushing_output(duration, ok, task)
             self.log_text.append(f'Done')
 
         return do_push_to_jira
+
+    def log_pushing_output(self, duration, ok, task):
+        log_info = f'Task: {task}, Duration: {format_timedelta_jira(duration)}'
+        log_status = 'Success' if ok else 'Fail'
+        log_color = 'blue' if ok else 'red'
+        text_logging = f'<span style=\"color:{log_color};\">{log_info} --> {log_status}</span>'
+        self.log_text.append(text_logging)
+        QtGui.QGuiApplication.processEvents()
+
+    def push_to_clockify(self, day: str):
+        date = datetime.date.fromisoformat(day)
+
+        def do_push_to_clockify():
+            df = self._dataframe
+            today_data = df[(df["Date"].dt.date == date) & (pd.isna(df['Check Out']) == False)]
+            self.log_text.setText(f'Pushing {day} clocking to Clockify worklog ...')
+            for _, data in today_data.iterrows():
+                task = data['Task']
+                start_datetime: datetime.datetime = data['Check In']
+                end_datetime: datetime.datetime = data['Check Out']
+                duration = end_datetime - start_datetime
+                start_datetime = datetime.datetime(date.year, date.month, date.day, start_datetime.hour, start_datetime.minute)
+                end_datetime = datetime.datetime(date.year, date.month, date.day, end_datetime.hour, end_datetime.minute)
+                ok = push_worklog_to_clockify(task, start_datetime, end_datetime)
+                self.log_pushing_output(duration, ok, task)
+            self.log_text.append(f'Done')
+
+        return do_push_to_clockify
 
     def compute_task_duration(self, day: datetime.date) -> Optional[dict]:
         df = self._dataframe
