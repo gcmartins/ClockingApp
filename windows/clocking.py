@@ -4,8 +4,8 @@ from typing import Optional, Callable
 import pandas as pd
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon, QTextCursor
-from PyQt5.QtWidgets import QWidget, QSystemTrayIcon, QMenu, QAction, QApplication, QLabel, QPushButton, QVBoxLayout, \
-    QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit
+from PyQt5.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QAction, QApplication, QLabel, QPushButton, QVBoxLayout, \
+    QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit, QWidget
 from pandas import DataFrame
 
 from models.task_ui import TaskUI
@@ -25,24 +25,34 @@ def save_clocking_csv_file(text: str) -> None:
         f.write(text)
 
 
-class Clocking(QWidget):
+class MainClocking(QMainWindow):
     EXIT_CODE_REBOOT = 122
-    def __init__(self):
+
+    def __init__(self) -> None:
         super().__init__()
-        self.timer_clocking_label = None
-        self.started_task_id: Optional[str] = None
-        self._dataframe: Optional[DataFrame] = None
-        self.load_dataframe()
-        self._is_checked_out = True
-        self._overtime_message_showed = False
 
-        self.timer = QTimer()
-        self.worked_hours = datetime.timedelta(0)
+        menubar = self.menuBar()
+        menu = menubar.addMenu('Menu')
 
-        self.setup_ui()
+        summary_action = QAction("Clocking Summary", self)
+        summary_action.triggered.connect(self.open_check_clocking)
 
-        self.timer.timeout.connect(self.update_time)
-        self.timer.start(1000)
+        update_task_action = QAction("Update Open Tasks", self)
+        # open_action.setShortcut('Ctrl+O')
+        update_task_action.triggered.connect(self.update_open_tasks)
+
+        close_action = QAction('Exit', self)
+        close_action.setShortcut('Ctrl+Q')
+        close_action.triggered.connect(QApplication.quit)
+
+        menu.addAction(summary_action)
+        menu.addAction(update_task_action)
+        menu.addSeparator()
+        menu.addAction(close_action)
+
+        self.clocking_window = Clocking()
+
+        self.setCentralWidget(self.clocking_window)
 
         # Initialize tray icon
         self.tray_icon = QSystemTrayIcon(self)
@@ -70,10 +80,7 @@ class Clocking(QWidget):
 
         # Show tray icon
         self.tray_icon.show()
-
-    def restart_app(self):
-        QApplication.exit(self.EXIT_CODE_REBOOT)
-
+    
     def update_open_tasks(self):
         with open(OPEN_TASK_CSV, 'w') as f:
             lines = [','.join(TASK_HEADER) + '\n']
@@ -84,19 +91,42 @@ class Clocking(QWidget):
         self.restart_app()
 
     def open_check_clocking(self):
-        self.check_clocking_window = ClockingSummary(self._dataframe)
+        self.check_clocking_window = ClockingSummary(self.clocking_window.dataframe)
         self.check_clocking_window.show()
+
+    def restart_app(self):
+        QApplication.exit(self.EXIT_CODE_REBOOT)
 
     def closeEvent(self, event):
         event.ignore()
         self.hide()
 
-    def load_dataframe(self):
-        self._dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=["Date", "Check In", "Check Out"])
-
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:
             self.showNormal()
+        
+
+class Clocking(QWidget):
+    EXIT_CODE_REBOOT = 122
+    def __init__(self):
+        super().__init__()
+        self.timer_clocking_label = None
+        self.started_task_id: Optional[str] = None
+        self.dataframe: Optional[DataFrame] = None
+        self.load_dataframe()
+        self._is_checked_out = True
+        self._overtime_message_showed = False
+
+        self.timer = QTimer()
+        self.worked_hours = datetime.timedelta(0)
+
+        self.setup_ui()
+
+        self.timer.timeout.connect(self.update_time)
+        self.timer.start(1000)
+
+    def load_dataframe(self):
+        self.dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=["Date", "Check In", "Check Out"])
 
     def setup_ui(self):
         self.setWindowTitle("Clocking")
@@ -212,7 +242,7 @@ class Clocking(QWidget):
         self.warn_if_overtime()
 
     def get_today_worked_hours(self) -> datetime.timedelta:
-        df = self._dataframe
+        df = self.dataframe
         if len(df) == 0:
             return datetime.timedelta(0)
         today = datetime.date.today()
