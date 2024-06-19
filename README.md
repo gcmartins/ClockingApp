@@ -30,9 +30,9 @@ The `setup.sh` script will install the environment and create a launcher file (`
 ## Integration with Jira
 To perform actions related to Jira, you need to create a `.env` file with your credentials as the example below: 
 ```text
-JIRA_EMAIL=your@email.com
-JIRA_TOKEN=<YOUR JIRA TOKEN>
-JIRA_URL=https://yourcompany.atlassian.net
+ATLASSIAN_EMAIL=your@email.com
+ATLASSIAN_TOKEN=<YOUR JIRA TOKEN>
+ATLASSIAN_URL=https://yourcompany.atlassian.net
 ```
 
 ## Integration with Clockify
