@@ -12,7 +12,7 @@ from services.exceptions import ClockingException
 
 load_dotenv()
 
-OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do']
+OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do', 'Triage']
 
 
 class JiraConfig:
@@ -33,7 +33,7 @@ class JiraConfig:
         return HTTPBasicAuth(self.email, self.token)
 
 
-_CONFIG = JiraConfig(f"{os.getenv('JIRA_URL')}/rest/api/3", os.getenv('JIRA_EMAIL'), os.getenv('JIRA_TOKEN'))
+_CONFIG = JiraConfig(f"{os.getenv('ATLASSIAN_URL')}/rest/api/3", os.getenv('ATLASSIAN_EMAIL'), os.getenv('ATLASSIAN_TOKEN'))
 
 
 @cache
