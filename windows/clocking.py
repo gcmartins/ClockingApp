@@ -48,11 +48,7 @@ class MainClocking(QMainWindow):
         menu.addAction(summary_action)
         menu.addAction(update_task_action)
         menu.addSeparator()
-        menu.addAction(close_action)
-
-        self.clocking_window = Clocking()
-
-        self.setCentralWidget(self.clocking_window)
+        menu.addAction(close_action) 
 
         # Initialize tray icon
         self.tray_icon = QSystemTrayIcon(self)
@@ -80,6 +76,9 @@ class MainClocking(QMainWindow):
 
         # Show tray icon
         self.tray_icon.show()
+
+        self.clocking_window = Clocking(self.tray_icon)
+        self.setCentralWidget(self.clocking_window)
     
     def update_open_tasks(self):
         with open(OPEN_TASK_CSV, 'w') as f:
@@ -108,8 +107,9 @@ class MainClocking(QMainWindow):
 
 class Clocking(QWidget):
     EXIT_CODE_REBOOT = 122
-    def __init__(self):
+    def __init__(self, tray_icon: QSystemTrayIcon):
         super().__init__()
+        self.tray_icon = tray_icon
         self.timer_clocking_label = None
         self.started_task_id: Optional[str] = None
         self.dataframe: Optional[DataFrame] = None
