@@ -77,7 +77,8 @@ def get_jira_open_issues() -> List[dict]:
     for issue in r['issues']:
         status = issue['fields']['status']['name']
         if status in OPEN_ISSUE_STATUS:
-            summary = issue['fields']['summary']
+            summary: str = issue['fields']['summary']
+            summary = f'"{summary}"'
             open_issues.append({'task': issue['key'], 'description': summary})
 
     return open_issues
