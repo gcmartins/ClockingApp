@@ -9,10 +9,11 @@ from PyQt5.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QActio
 from pandas import DataFrame
 
 from models.task_ui import TaskUI
-from services.constants import OPEN_TASK_CSV, TASK_HEADER, CLOCKING_CSV, FIXED_TASK_CSV
+from services.constants import OPEN_TASK_CSV, TASK_HEADER, CLOCKING_CSV, FIXED_TASK_CSV, CLOCKING_HEADER
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
 from windows.clocking_summary import ClockingSummary
+from windows.eod_report import EodReport
 
 
 def get_clocking_csv_text() -> str:
@@ -41,12 +42,16 @@ class MainClocking(QMainWindow):
         # open_action.setShortcut('Ctrl+O')
         update_task_action.triggered.connect(self.update_open_tasks)
 
+        eod_report_action = QAction("EOD Report", self)
+        eod_report_action.triggered.connect(self.generate_eod_report)
+
         close_action = QAction('Exit', self)
         close_action.setShortcut('Ctrl+Q')
         close_action.triggered.connect(QApplication.quit)
 
         menu.addAction(summary_action)
         menu.addAction(update_task_action)
+        menu.addAction(eod_report_action)
         menu.addSeparator()
         menu.addAction(close_action) 
 
@@ -93,6 +98,10 @@ class MainClocking(QMainWindow):
         self.check_clocking_window = ClockingSummary(self.clocking_window.dataframe)
         self.check_clocking_window.show()
 
+    def generate_eod_report(self):
+        self.eod_report = EodReport(self.clocking_window.dataframe)
+        self.eod_report.show()
+
     def restart_app(self):
         QApplication.exit(self.EXIT_CODE_REBOOT)
 
@@ -126,7 +135,7 @@ class Clocking(QWidget):
         self.timer.start(1000)
 
     def load_dataframe(self):
-        self.dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=["Date", "Check In", "Check Out"])
+        self.dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=CLOCKING_HEADER)
 
     def setup_ui(self):
         self.setWindowTitle("Clocking")
@@ -179,7 +188,7 @@ class Clocking(QWidget):
         self.create_buttons_from_csv(FIXED_TASK_CSV)
 
     def create_buttons_from_csv(self, task_csv: str):
-        task_df = pd.read_csv(task_csv, names=["Task", "Description"], header=0)
+        task_df = pd.read_csv(task_csv, names=TASK_HEADER, header=0)
         for _, task in task_df.iterrows():
             task_id = task['Task']
             btn_check_in = QPushButton(task_id)
@@ -202,7 +211,7 @@ class Clocking(QWidget):
                 self.record_check_out()
             with open(CLOCKING_CSV, "a") as f:
                 current_time = datetime.datetime.now()
-                f.write("{},{},{},\n".format(current_time.date(), task_id, current_time.time().strftime("%H:%M")))
+                f.write("{},{},{},,\n".format(current_time.date(), task_id, current_time.time().strftime("%H:%M")))
             self.load_dataframe()
             self.started_task_id = task_id
             self.update_buttons()
@@ -215,7 +224,7 @@ class Clocking(QWidget):
             if len(lines) == 0:
                 return
             last_line = lines[-1].rstrip('\n').split(',')
-            if len(last_line) == 4 and last_line[3] == '':
+            if len(last_line) == 5 and last_line[3] == '':
                 started_date = last_line[0]
                 now_datetime = datetime.datetime.now()
                 end_date = now_datetime.date().isoformat()
