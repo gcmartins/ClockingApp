@@ -13,8 +13,10 @@ from services.constants import OPEN_TASK_CSV, TASK_HEADER, CLOCKING_CSV, FIXED_T
 from services.csv_validator import validate_clocking_csv_format
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
+from services.config_manager import get_config_manager
 from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
+from windows.settings import SettingsDialog
 
 
 def get_clocking_csv_text() -> str:
@@ -50,6 +52,9 @@ class MainClocking(QMainWindow):
         eod_report_action = QAction("EOD Report", self)
         eod_report_action.triggered.connect(self.generate_eod_report)
 
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(self.open_settings)
+
         close_action = QAction('Exit', self)
         close_action.setShortcut('Ctrl+Q')
         close_action.triggered.connect(QApplication.quit)
@@ -57,6 +62,8 @@ class MainClocking(QMainWindow):
         menu.addAction(summary_action)
         menu.addAction(update_task_action)
         menu.addAction(eod_report_action)
+        menu.addSeparator()
+        menu.addAction(settings_action)
         menu.addSeparator()
         menu.addAction(close_action) 
 
@@ -91,13 +98,32 @@ class MainClocking(QMainWindow):
         self.setCentralWidget(self.clocking_window)
     
     def update_open_tasks(self):
-        with open(OPEN_TASK_CSV, 'w') as f:
-            lines = [','.join(TASK_HEADER) + '\n']
-            for issue in get_jira_open_issues():
-                lines.append(f'{issue["task"]},{issue["description"]}\n')
-
-            f.writelines(lines)
-        self.restart_app()
+        config = get_config_manager()
+        is_configured, _ = config.is_jira_configured()
+        
+        if not is_configured:
+            QMessageBox.warning(
+                self,
+                "Jira Not Configured",
+                "Please configure Jira API settings in Menu → Settings to use this feature."
+            )
+            return
+        
+        try:
+            issues = get_jira_open_issues()
+            if len(issues) != 0:
+                lines = [','.join(TASK_HEADER)+'\n']
+                for issue in issues:
+                    lines.append(f'{issue["task"]},"{issue["description"]}"\n')
+                with open(OPEN_TASK_CSV, 'w') as f:
+                    f.writelines(lines)
+            self.restart_app()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Failed to Update Tasks",
+                f"Error updating open tasks from Jira: {str(e)}"
+            )
 
     def open_check_clocking(self):
         self.check_clocking_window = ClockingSummary(self.clocking_window.dataframe)
@@ -106,6 +132,20 @@ class MainClocking(QMainWindow):
     def generate_eod_report(self):
         self.eod_report = EodReport(self.clocking_window.dataframe)
         self.eod_report.show()
+
+    def open_settings(self):
+        settings_dialog = SettingsDialog(self)
+        if settings_dialog.exec_() == SettingsDialog.Accepted:
+            # Settings were saved, ask if user wants to restart
+            reply = QMessageBox.question(
+                self,
+                "Restart Required",
+                "Settings have been updated. Would you like to restart the application to apply changes?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self.restart_app()
 
     def restart_app(self):
         QApplication.exit(self.EXIT_CODE_REBOOT)

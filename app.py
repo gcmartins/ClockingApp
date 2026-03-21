@@ -12,6 +12,7 @@ APP_FILE_HEADERS = {
 }
 
 if __name__ == '__main__':
+    # Initialize CSV files if they don't exist
     for filename, header in APP_FILE_HEADERS.items():
         if not os.path.isfile(filename):
             with open(filename, "w") as f:
