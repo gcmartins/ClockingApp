@@ -23,8 +23,13 @@ def get_project_name(project_key: str) -> str:
     try:
         project = get_jira().project(project_key, expand='name')
         return project.name
-    except:
-        raise ClockingException('Failed to get Jira project name')
+    except Exception as e:
+        raise ClockingException('Failed to get Jira project name') from e
+
+
+def clear_jira_cache() -> None:
+    """Clear cached Jira API results (call after credential updates)."""
+    get_project_name.cache_clear()
 
 
 def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, duration: datetime.timedelta) -> bool:
@@ -34,8 +39,8 @@ def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, dura
 
         get_jira().add_worklog(issue_key, timeSpentSeconds=timeSpent, started=start_datetime)
         return True
-    except:
-        pass
+    except Exception as e:
+        print(f"Error pushing worklog to Jira: {e}")
 
     return False
 

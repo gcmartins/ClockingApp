@@ -168,11 +168,8 @@ def validate_clocking_csv_format(csv_content: str) -> Tuple[bool, Optional[str]]
             if check_in and check_out:
                 check_in_dt = datetime.datetime.strptime(check_in, "%H:%M")
                 check_out_dt = datetime.datetime.strptime(check_out, "%H:%M")
-                
-                # Allow check out at 23:59 and check in at 00:00 (cross-day clocking)
-                if not (check_out == "23:59" or check_in == "00:00"):
-                    if check_out_dt < check_in_dt:
-                        return False, f"Row {row_num}: Check-out time '{check_out}' cannot be before check-in time '{check_in}'"
+                if check_out_dt < check_in_dt:
+                    return False, f"Row {row_num}: Check-out time '{check_out}' cannot be before check-in time '{check_in}'"
             
             # Validate message format
             if not validate_message_format(message):

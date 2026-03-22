@@ -94,6 +94,12 @@ def log_time_in_clockify(
     return response.ok
 
 
+def clear_clockify_cache() -> None:
+    """Clear cached Clockify API results (call after credential updates)."""
+    find_clockify_project.cache_clear()
+    find_or_create_clockify_task.cache_clear()
+
+
 def push_worklog_to_clockify(
     task_key: str,
     start_time: datetime,

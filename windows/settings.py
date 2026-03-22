@@ -1,8 +1,10 @@
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QGroupBox, QMessageBox,
                              QFormLayout, QTabWidget, QWidget)
 from PyQt5.QtCore import Qt
 from services.config_manager import get_config_manager
+from services.jira_api import clear_jira_cache
+from services.clockify_api import clear_clockify_cache
 
 
 class SettingsDialog(QDialog):
@@ -186,6 +188,8 @@ class SettingsDialog(QDialog):
         
         # Save to file
         if self.config_manager.save():
+            clear_jira_cache()
+            clear_clockify_cache()
             QMessageBox.information(
                 self,
                 "Settings Saved",

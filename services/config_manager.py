@@ -62,19 +62,15 @@ class ConfigManager:
     def save(self) -> bool:
         """
         Save configuration to .env file
-        
+
         Returns:
             True if successful, False otherwise
         """
         try:
-            # Create .env file if it doesn't exist
-            if not os.path.exists(self.env_path):
-                open(self.env_path, 'a').close()
-            
-            # Write all configuration values
+            # Write all configuration values (set_key creates the file if missing)
             for key, value in self._config.items():
                 set_key(self.env_path, key, value)
-            
+
             # Reload to ensure consistency
             self.load_config()
             return True
@@ -100,50 +96,36 @@ class ConfigManager:
         """
         self._config.update(config)
     
+    def _is_configured(self, keys: list[str]) -> tuple[bool, list[str]]:
+        missing_keys = [key for key in keys if not self._config.get(key, '').strip()]
+        return len(missing_keys) == 0, missing_keys
+
     def is_valid(self) -> tuple[bool, list[str]]:
         """
         Check if all required configuration is present and non-empty
-        
+
         Returns:
             Tuple of (is_valid, list of missing keys)
         """
-        missing_keys = []
-        for key in self.ALL_REQUIRED_KEYS:
-            value = self._config.get(key, '').strip()
-            if not value:
-                missing_keys.append(key)
-        
-        return len(missing_keys) == 0, missing_keys
-    
+        return self._is_configured(self.ALL_REQUIRED_KEYS)
+
     def is_jira_configured(self) -> tuple[bool, list[str]]:
         """
         Check if Jira configuration is complete
-        
+
         Returns:
             Tuple of (is_valid, list of missing keys)
         """
-        missing_keys = []
-        for key in self.REQUIRED_JIRA_KEYS:
-            value = self._config.get(key, '').strip()
-            if not value:
-                missing_keys.append(key)
-        
-        return len(missing_keys) == 0, missing_keys
-    
+        return self._is_configured(self.REQUIRED_JIRA_KEYS)
+
     def is_clockify_configured(self) -> tuple[bool, list[str]]:
         """
         Check if Clockify configuration is complete
-        
+
         Returns:
             Tuple of (is_valid, list of missing keys)
         """
-        missing_keys = []
-        for key in self.REQUIRED_CLOCKIFY_KEYS:
-            value = self._config.get(key, '').strip()
-            if not value:
-                missing_keys.append(key)
-        
-        return len(missing_keys) == 0, missing_keys
+        return self._is_configured(self.REQUIRED_CLOCKIFY_KEYS)
 
 
 # Global instance

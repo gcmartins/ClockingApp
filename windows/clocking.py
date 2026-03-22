@@ -1,4 +1,6 @@
+import csv
 import datetime
+import io
 from typing import Optional, Callable
 
 import pandas as pd
@@ -25,10 +27,6 @@ def get_clocking_csv_text() -> str:
 
 
 def save_clocking_csv_file(text: str) -> None:
-    # Validate before writing
-    is_valid, error = validate_clocking_csv_format(text)
-    if not is_valid:
-        raise ValueError(f"Cannot save invalid CSV: {error}")
     with open(CLOCKING_CSV, "w") as f:
         f.write(text)
 
@@ -112,11 +110,13 @@ class MainClocking(QMainWindow):
         try:
             issues = get_jira_open_issues()
             if len(issues) != 0:
-                lines = [','.join(TASK_HEADER)+'\n']
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(TASK_HEADER)
                 for issue in issues:
-                    lines.append(f'{issue["task"]},"{issue["description"]}"\n')
+                    writer.writerow([issue["task"], issue["description"]])
                 with open(OPEN_TASK_CSV, 'w') as f:
-                    f.writelines(lines)
+                    f.write(output.getvalue())
             self.restart_app()
         except Exception as e:
             QMessageBox.critical(
