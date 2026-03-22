@@ -189,7 +189,22 @@ class Clocking(QWidget):
                 # Try to load anyway but user needs to fix it
                 self.dataframe = pd.DataFrame(columns=CLOCKING_HEADER)
                 return
-            self.dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=CLOCKING_HEADER)
+            dataframe = pd.read_csv(CLOCKING_CSV)
+            dataframe["Date"] = pd.to_datetime(dataframe["Date"], format="%Y-%m-%d", errors="coerce")
+
+            # Build full datetimes using Date + HH:MM time strings for duration calculations.
+            date_part = dataframe["Date"].dt.strftime("%Y-%m-%d")
+            dataframe["Check In"] = pd.to_datetime(
+                date_part + " " + dataframe["Check In"].astype("string"),
+                format="%Y-%m-%d %H:%M",
+                errors="coerce",
+            )
+            dataframe["Check Out"] = pd.to_datetime(
+                date_part + " " + dataframe["Check Out"].astype("string"),
+                format="%Y-%m-%d %H:%M",
+                errors="coerce",
+            )
+            self.dataframe = dataframe
         except Exception as e:
             self.show_csv_error(f"Failed to load CSV file: {str(e)}")
             self.dataframe = pd.DataFrame(columns=CLOCKING_HEADER)
@@ -369,7 +384,7 @@ class Clocking(QWidget):
                 self.show_overtime_message(todays_hours)
                 self._overtime_message_showed = True
         else:
-            self.timer_clocking_label.setStyleSheet("color: black")
+            self.timer_clocking_label.setStyleSheet("color: green")
 
     def show_overtime_message(self, todays_hours):
         self.tray_icon.showMessage(
