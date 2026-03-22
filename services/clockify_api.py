@@ -1,15 +1,12 @@
-import os
 from datetime import datetime
 from functools import cache
 from zoneinfo import ZoneInfo
 
 import requests
-from dotenv import load_dotenv
 
 from services.exceptions import ClockingException
 from services.jira_api import get_project_name
-
-load_dotenv()
+from services.config_manager import get_config_manager
 
 
 class ClockifyConfig:
@@ -26,14 +23,21 @@ class ClockifyConfig:
         }
 
 
-_CONFIG = ClockifyConfig(os.getenv('CLOCKIFY_WORKSPACE'), os.getenv('CLOCKIFY_API_KEY'))
+def _get_config():
+    """Get Clockify configuration from config manager"""
+    config = get_config_manager()
+    return ClockifyConfig(
+        config.get('CLOCKIFY_WORKSPACE'),
+        config.get('CLOCKIFY_API_KEY')
+    )
 
 
 @cache
 def find_clockify_project(project_name: str) -> str:
-    projects_url = f'{_CONFIG.url}/{_CONFIG.workspace}/projects'
+    config = _get_config()
+    projects_url = f'{config.url}/{config.workspace}/projects'
     params = {'name': project_name, 'strict-name-search': True}
-    response = requests.get(projects_url, headers=_CONFIG.headers, params=params)
+    response = requests.get(projects_url, headers=config.headers, params=params)
     projects = response.json()
 
     if not response.ok or len(projects) == 0:
@@ -44,16 +48,17 @@ def find_clockify_project(project_name: str) -> str:
 
 @cache
 def find_or_create_clockify_task(project_id: str, task_name: str) -> str:
-    tasks_url = f'{_CONFIG.url}/{_CONFIG.workspace}/projects/{project_id}/tasks'
+    config = _get_config()
+    tasks_url = f'{config.url}/{config.workspace}/projects/{project_id}/tasks'
     params = {'name': task_name, 'strict-name-search': True}
-    response = requests.get(tasks_url, headers=_CONFIG.headers, params=params)
+    response = requests.get(tasks_url, headers=config.headers, params=params)
     tasks = response.json()
 
     if len(tasks):
         return tasks[0]['id']
 
     data = {'name': task_name}
-    response = requests.post(tasks_url, json=data, headers=_CONFIG.headers)
+    response = requests.post(tasks_url, json=data, headers=config.headers)
 
     if not response.ok:
         raise ClockingException()
@@ -69,13 +74,14 @@ def convert_datetime_to_utc(dt: datetime) -> str:
 
 
 def log_time_in_clockify(
-        project_id: str,
-        task_id: str,
-        task_key: str,
-        start_time: datetime,
-        end_time: datetime,
+    project_id: str,
+    task_id: str,
+    task_key: str,
+    start_time: datetime,
+    end_time: datetime,
 ) -> bool:
-    url = f'{_CONFIG.url}/{_CONFIG.workspace}/time-entries'
+    config = _get_config()
+    url = f'{config.url}/{config.workspace}/time-entries'
     data = {
         'start': convert_datetime_to_utc(start_time),
         'end': convert_datetime_to_utc(end_time),
@@ -84,9 +90,14 @@ def log_time_in_clockify(
         'projectId': project_id,
         'taskId': task_id,
     }
-    response = requests.post(url, json=data, headers=_CONFIG.headers)
-
+    response = requests.post(url, json=data, headers=config.headers)    
     return response.ok
+
+
+def clear_clockify_cache() -> None:
+    """Clear cached Clockify API results (call after credential updates)."""
+    find_clockify_project.cache_clear()
+    find_or_create_clockify_task.cache_clear()
 
 
 def push_worklog_to_clockify(

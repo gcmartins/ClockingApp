@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit
 from services.clockify_api import push_worklog_to_clockify
 from services.utils import format_timedelta, format_timedelta_jira
 from services.jira_api import push_worklog_to_jira
+from services.config_manager import get_config_manager
 
 
 class ClockingSummary(QWidget):
@@ -56,6 +57,13 @@ class ClockingSummary(QWidget):
 
 
     def push_to_jira(self, day: str) -> None:
+        config = get_config_manager()
+        is_configured, missing = config.is_jira_configured()
+        
+        if not is_configured:
+            self.log_text.append(f'<span style="color:red;">Jira is not configured. Please configure it in Menu → Settings.</span>')
+            return
+        
         date = datetime.date.fromisoformat(day)
 
         df = self._dataframe
@@ -80,6 +88,13 @@ class ClockingSummary(QWidget):
         QtGui.QGuiApplication.processEvents()
 
     def push_to_clockify(self, day: str) -> None:
+        config = get_config_manager()
+        is_configured, missing = config.is_clockify_configured()
+        
+        if not is_configured:
+            self.log_text.append(f'<span style="color:red;">Clockify is not configured. Please configure it in Menu → Settings.</span>')
+            return
+        
         date = datetime.date.fromisoformat(day)
 
         df = self._dataframe

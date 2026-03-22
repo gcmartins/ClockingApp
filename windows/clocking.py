@@ -1,19 +1,24 @@
+import csv
 import datetime
+import io
 from typing import Optional, Callable
 
 import pandas as pd
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon, QTextCursor
 from PyQt5.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QAction, QApplication, QLabel, QPushButton, QVBoxLayout, \
-    QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit, QWidget
+    QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit, QWidget, QMessageBox
 from pandas import DataFrame
 
 from models.task_ui import TaskUI
 from services.constants import OPEN_TASK_CSV, TASK_HEADER, CLOCKING_CSV, FIXED_TASK_CSV, CLOCKING_HEADER
+from services.csv_validator import validate_clocking_csv_format
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
+from services.config_manager import get_config_manager
 from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
+from windows.settings import SettingsDialog
 
 
 def get_clocking_csv_text() -> str:
@@ -45,6 +50,9 @@ class MainClocking(QMainWindow):
         eod_report_action = QAction("EOD Report", self)
         eod_report_action.triggered.connect(self.generate_eod_report)
 
+        settings_action = QAction("Settings", self)
+        settings_action.triggered.connect(self.open_settings)
+
         close_action = QAction('Exit', self)
         close_action.setShortcut('Ctrl+Q')
         close_action.triggered.connect(QApplication.quit)
@@ -52,6 +60,8 @@ class MainClocking(QMainWindow):
         menu.addAction(summary_action)
         menu.addAction(update_task_action)
         menu.addAction(eod_report_action)
+        menu.addSeparator()
+        menu.addAction(settings_action)
         menu.addSeparator()
         menu.addAction(close_action) 
 
@@ -86,13 +96,34 @@ class MainClocking(QMainWindow):
         self.setCentralWidget(self.clocking_window)
     
     def update_open_tasks(self):
-        with open(OPEN_TASK_CSV, 'w') as f:
-            lines = [','.join(TASK_HEADER) + '\n']
-            for issue in get_jira_open_issues():
-                lines.append(f'{issue["task"]},{issue["description"]}\n')
-
-            f.writelines(lines)
-        self.restart_app()
+        config = get_config_manager()
+        is_configured, _ = config.is_jira_configured()
+        
+        if not is_configured:
+            QMessageBox.warning(
+                self,
+                "Jira Not Configured",
+                "Please configure Jira API settings in Menu → Settings to use this feature."
+            )
+            return
+        
+        try:
+            issues = get_jira_open_issues()
+            if len(issues) != 0:
+                output = io.StringIO()
+                writer = csv.writer(output)
+                writer.writerow(TASK_HEADER)
+                for issue in issues:
+                    writer.writerow([issue["task"], issue["description"]])
+                with open(OPEN_TASK_CSV, 'w') as f:
+                    f.write(output.getvalue())
+            self.restart_app()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Failed to Update Tasks",
+                f"Error updating open tasks from Jira: {str(e)}"
+            )
 
     def open_check_clocking(self):
         self.check_clocking_window = ClockingSummary(self.clocking_window.dataframe)
@@ -101,6 +132,20 @@ class MainClocking(QMainWindow):
     def generate_eod_report(self):
         self.eod_report = EodReport(self.clocking_window.dataframe)
         self.eod_report.show()
+
+    def open_settings(self):
+        settings_dialog = SettingsDialog(self)
+        if settings_dialog.exec_() == SettingsDialog.Accepted:
+            # Settings were saved, ask if user wants to restart
+            reply = QMessageBox.question(
+                self,
+                "Restart Required",
+                "Settings have been updated. Would you like to restart the application to apply changes?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.Yes
+            )
+            if reply == QMessageBox.Yes:
+                self.restart_app()
 
     def restart_app(self):
         QApplication.exit(self.EXIT_CODE_REBOOT)
@@ -135,7 +180,19 @@ class Clocking(QWidget):
         self.timer.start(1000)
 
     def load_dataframe(self):
-        self.dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=CLOCKING_HEADER)
+        # Validate CSV before loading
+        try:
+            csv_content = get_clocking_csv_text()
+            is_valid, error = validate_clocking_csv_format(csv_content)
+            if not is_valid:
+                self.show_csv_error(f"CSV file is malformed: {error}")
+                # Try to load anyway but user needs to fix it
+                self.dataframe = pd.DataFrame(columns=CLOCKING_HEADER)
+                return
+            self.dataframe = pd.read_csv(CLOCKING_CSV, parse_dates=CLOCKING_HEADER)
+        except Exception as e:
+            self.show_csv_error(f"Failed to load CSV file: {str(e)}")
+            self.dataframe = pd.DataFrame(columns=CLOCKING_HEADER)
 
     def setup_ui(self):
         self.setWindowTitle("Clocking")
@@ -172,9 +229,34 @@ class Clocking(QWidget):
         self.btn_stop.clicked.connect(self.record_check_out)
 
     def save_csv_file(self):
-        save_clocking_csv_file(self.csv_text.toPlainText())
+        csv_content = self.csv_text.toPlainText()
+        
+        # Validate CSV format before saving
+        is_valid, error_message = validate_clocking_csv_format(csv_content)
+        
+        if not is_valid:
+            # Show error message to user
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Critical)
+            msg_box.setWindowTitle("CSV Validation Error")
+            msg_box.setText("Failed to save CSV file due to validation error.")
+            msg_box.setDetailedText(error_message)
+            msg_box.setStandardButtons(QMessageBox.Ok)
+            msg_box.exec_()
+            return
+        
+        # If validation passes, save the file
+        save_clocking_csv_file(csv_content)
         self.load_dataframe()
         self.update_buttons()
+        
+        # Show success message
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setWindowTitle("CSV Saved")
+        msg_box.setText("CSV file has been successfully validated and saved.")
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec_()
 
     def update_csv_text(self):
         self.csv_text.setPlainText(get_clocking_csv_text())
@@ -244,6 +326,16 @@ class Clocking(QWidget):
         self.load_dataframe()
         self.update_buttons()
         self.update_csv_text()
+
+    def show_csv_error(self, message: str):
+        """Display CSV error to user."""
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setWindowTitle("CSV Error")
+        msg_box.setText(message)
+        msg_box.setInformativeText("Please fix the CSV file manually or it may cause data corruption.")
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec_()
 
     def update_time(self):
         self.worked_hours = self.get_today_worked_hours()
