@@ -36,6 +36,7 @@ class MainClocking(QMainWindow):
 
     def __init__(self) -> None:
         super().__init__()
+        self.setWindowTitle("Clocking App")
 
         menubar = self.menuBar()
         menu = menubar.addMenu('Menu')
@@ -135,7 +136,7 @@ class MainClocking(QMainWindow):
 
     def open_settings(self):
         settings_dialog = SettingsDialog(self)
-        if settings_dialog.exec() == SettingsDialog.Accepted:
+        if settings_dialog.exec() == SettingsDialog.DialogCode.Accepted:
             # Settings were saved, ask if user wants to restart
             reply = QMessageBox.question(
                 self,

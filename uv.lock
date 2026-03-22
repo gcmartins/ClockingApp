@@ -127,15 +127,9 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "jira" },
-    { name = "numpy" },
     { name = "pandas" },
     { name = "pyside6" },
-    { name = "python-dateutil" },
     { name = "python-dotenv" },
-    { name = "pytz" },
-    { name = "requests" },
-    { name = "six" },
-    { name = "tzdata" },
 ]
 
 [package.dev-dependencies]
@@ -146,15 +140,9 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "jira", specifier = ">=3.10.5" },
-    { name = "numpy", specifier = "==1.26.4" },
     { name = "pandas", specifier = "==2.2.0" },
     { name = "pyside6", specifier = ">=6.6.0" },
-    { name = "python-dateutil", specifier = "==2.8.2" },
     { name = "python-dotenv", specifier = "~=1.0.1" },
-    { name = "pytz", specifier = "==2024.1" },
-    { name = "requests", specifier = "~=2.31.0" },
-    { name = "six", specifier = "==1.16.0" },
-    { name = "tzdata", specifier = "==2024.1" },
 ]
 
 [package.metadata.requires-dev]
