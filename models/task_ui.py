@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QPushButton, QLabel
+from PySide6.QtWidgets import QPushButton, QLabel
 
 
 class TaskUI:

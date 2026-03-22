@@ -1,7 +1,7 @@
 import datetime
 from typing import Optional, Dict, List
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QTextEdit
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 
 import pandas as pd
 

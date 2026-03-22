@@ -1,0 +1,16 @@
+[project]
+name = "clocking-app"
+version = "0.1.0"
+description = "A desktop application to register clockings into a CSV file"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas==2.2.0",
+    "PySide6>=6.6.0",
+    "python-dotenv~=1.0.1",
+    "jira>=3.10.5",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.0",
+]

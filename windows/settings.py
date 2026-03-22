@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                             QLineEdit, QPushButton, QGroupBox, QMessageBox,
-                             QFormLayout, QTabWidget, QWidget)
-from PyQt5.QtCore import Qt
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+                              QLineEdit, QPushButton, QGroupBox, QMessageBox,
+                              QFormLayout, QTabWidget, QWidget)
+from PySide6.QtCore import Qt
 from services.config_manager import get_config_manager
 from services.jira_api import clear_jira_cache
 from services.clockify_api import clear_clockify_cache
@@ -85,7 +85,7 @@ class SettingsDialog(QDialog):
         
         # Token with show/hide button
         self.jira_token_input = QLineEdit()
-        self.jira_token_input.setEchoMode(QLineEdit.Password)
+        self.jira_token_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.jira_token_input.setPlaceholderText("Your Jira API token")
         
         show_jira_token_btn = QPushButton("Show")
@@ -128,7 +128,7 @@ class SettingsDialog(QDialog):
         
         # API Key
         self.clockify_api_key_input = QLineEdit()
-        self.clockify_api_key_input.setEchoMode(QLineEdit.Password)
+        self.clockify_api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.clockify_api_key_input.setPlaceholderText("Your Clockify API key")
         
         # Show/hide password button
@@ -158,10 +158,10 @@ class SettingsDialog(QDialog):
     def toggle_password_visibility(self, line_edit: QLineEdit, button: QPushButton, show: bool):
         """Toggle password visibility for a line edit"""
         if show:
-            line_edit.setEchoMode(QLineEdit.Normal)
+            line_edit.setEchoMode(QLineEdit.EchoMode.Normal)
             button.setText("Hide")
         else:
-            line_edit.setEchoMode(QLineEdit.Password)
+            line_edit.setEchoMode(QLineEdit.EchoMode.Password)
             button.setText("Show")
     
     def load_current_settings(self):
@@ -229,4 +229,4 @@ class SettingsDialog(QDialog):
         welcome_label.setWordWrap(True)
         dialog.layout().insertWidget(0, welcome_label)
         
-        return dialog.exec_() == QDialog.Accepted
+        return dialog.exec() == QDialog.DialogCode.Accepted

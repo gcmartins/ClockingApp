@@ -3,9 +3,9 @@ from typing import Optional
 import pandas as pd
 import datetime
 
-from PyQt5 import QtGui
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
+from PySide6 import QtGui
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
 
 from services.clockify_api import push_worklog_to_clockify
 from services.utils import format_timedelta, format_timedelta_jira
@@ -29,7 +29,7 @@ class ClockingSummary(QWidget):
 
         for task in week_tasks:
             vbox = QVBoxLayout()
-            vbox.addWidget(QLabel(task['date']), alignment=Qt.AlignTop)
+            vbox.addWidget(QLabel(task['date']), alignment=Qt.AlignmentFlag.AlignTop)
             clockings = QTextEdit(task['clockings'])
             clockings.setReadOnly(True)
             vbox.addWidget(clockings)
@@ -39,7 +39,7 @@ class ClockingSummary(QWidget):
             push_button.clicked.connect(self.push_clockings(task['date']))
             buttons_layout.addWidget(push_button)
             vbox.addLayout(buttons_layout)
-            vbox.addWidget(QLabel(task['total']), alignment=Qt.AlignBottom)
+            vbox.addWidget(QLabel(task['total']), alignment=Qt.AlignmentFlag.AlignBottom)
             hbox.addLayout(vbox)
 
         main_layout.addLayout(hbox)
