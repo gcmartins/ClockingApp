@@ -1,6 +1,6 @@
 import os.path
 
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication
 
 from windows.clocking import MainClocking
 from services.constants import FIXED_TASK_CSV, OPEN_TASK_CSV, CLOCKING_CSV, CLOCKING_HEADER, TASK_HEADER
@@ -25,5 +25,5 @@ if __name__ == '__main__':
         app = QApplication([])
         widget = MainClocking()
         widget.show()
-        currentExitCode = app.exec_()
+        currentExitCode = app.exec()
         app = None  # delete the QApplication object

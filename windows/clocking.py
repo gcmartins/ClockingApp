@@ -4,9 +4,9 @@ import io
 from typing import Optional, Callable
 
 import pandas as pd
-from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QIcon, QTextCursor
-from PyQt5.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QAction, QApplication, QLabel, QPushButton, QVBoxLayout, \
+from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon, QTextCursor, QAction
+from PySide6.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QApplication, QLabel, QPushButton, QVBoxLayout, \
     QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit, QWidget, QMessageBox
 from pandas import DataFrame
 
@@ -135,16 +135,16 @@ class MainClocking(QMainWindow):
 
     def open_settings(self):
         settings_dialog = SettingsDialog(self)
-        if settings_dialog.exec_() == SettingsDialog.Accepted:
+        if settings_dialog.exec() == SettingsDialog.Accepted:
             # Settings were saved, ask if user wants to restart
             reply = QMessageBox.question(
                 self,
                 "Restart Required",
                 "Settings have been updated. Would you like to restart the application to apply changes?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.Yes
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.Yes
             )
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.restart_app()
 
     def restart_app(self):
@@ -155,7 +155,7 @@ class MainClocking(QMainWindow):
         self.hide()
 
     def tray_icon_activated(self, reason):
-        if reason == QSystemTrayIcon.Trigger:
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.showNormal()
         
 
@@ -208,7 +208,7 @@ class Clocking(QWidget):
         hbox = QHBoxLayout()
         hbox.addWidget(QLabel("Timer:"))
         hbox.addWidget(self.timer_clocking_label)
-        hbox.addSpacerItem(QSpacerItem(100, 20, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        hbox.addSpacerItem(QSpacerItem(100, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         vbox.addLayout(hbox)
         for _, task in self.task_buttons.items():
             hbox = QHBoxLayout()
@@ -237,12 +237,12 @@ class Clocking(QWidget):
         if not is_valid:
             # Show error message to user
             msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Critical)
+            msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.setWindowTitle("CSV Validation Error")
             msg_box.setText("Failed to save CSV file due to validation error.")
             msg_box.setDetailedText(error_message)
-            msg_box.setStandardButtons(QMessageBox.Ok)
-            msg_box.exec_()
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg_box.exec()
             return
         
         # If validation passes, save the file
@@ -252,16 +252,16 @@ class Clocking(QWidget):
         
         # Show success message
         msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Information)
+        msg_box.setIcon(QMessageBox.Icon.Information)
         msg_box.setWindowTitle("CSV Saved")
         msg_box.setText("CSV file has been successfully validated and saved.")
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec_()
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     def update_csv_text(self):
         self.csv_text.setPlainText(get_clocking_csv_text())
         cursor = self.csv_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
+        cursor.movePosition(QTextCursor.MoveOperation.End)
         self.csv_text.setTextCursor(cursor)
 
     def create_task_buttons(self):
@@ -330,12 +330,12 @@ class Clocking(QWidget):
     def show_csv_error(self, message: str):
         """Display CSV error to user."""
         msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Critical)
+        msg_box.setIcon(QMessageBox.Icon.Critical)
         msg_box.setWindowTitle("CSV Error")
         msg_box.setText(message)
         msg_box.setInformativeText("Please fix the CSV file manually or it may cause data corruption.")
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec_()
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
 
     def update_time(self):
         self.worked_hours = self.get_today_worked_hours()
@@ -375,5 +375,5 @@ class Clocking(QWidget):
         self.tray_icon.showMessage(
             'Work Overtime',
             "You have worked {} today.".format(format_timedelta(todays_hours)),
-            QSystemTrayIcon.Warning,
+            QSystemTrayIcon.MessageIcon.Warning,
         )
