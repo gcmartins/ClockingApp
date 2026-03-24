@@ -1,6 +1,7 @@
 import csv
 import datetime
 import io
+import os
 from typing import Optional, Callable
 
 import pandas as pd
@@ -68,7 +69,8 @@ class MainClocking(QMainWindow):
 
         # Initialize tray icon
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon('clock.png'))
+        _icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'clock.png')
+        self.tray_icon.setIcon(QIcon(_icon_path))
         self.tray_icon.setToolTip('ClockingApp')
         self.tray_icon.activated.connect(self.tray_icon_activated)
 

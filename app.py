@@ -7,6 +7,10 @@ from PySide6.QtWidgets import QApplication
 from windows.clocking import MainClocking
 from services.constants import FIXED_TASK_CSV, OPEN_TASK_CSV, CLOCKING_CSV, CLOCKING_HEADER, TASK_HEADER
 
+# On Linux, force XCB (X11) platform so QSystemTrayIcon works under Wayland sessions
+if sys.platform.startswith('linux'):
+    os.environ.setdefault('QT_QPA_PLATFORM', 'xcb')
+
 APP_FILE_HEADERS = {
     CLOCKING_CSV: CLOCKING_HEADER,
     FIXED_TASK_CSV: TASK_HEADER,
@@ -23,6 +27,7 @@ if __name__ == '__main__':
                     f.write(f'TASK-KEY,Task description (you can change it by editing "{os.path.abspath(f.name)}" file)\n')
 
     app = QApplication(sys.argv)
+    app.setQuitOnLastWindowClosed(False)
     widget = MainClocking()
     widget.show()
     exitCode = app.exec()
