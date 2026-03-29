@@ -1,18 +1,18 @@
-import csv
 import datetime
-import io
 from typing import Optional, Callable
 
 import pandas as pd
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QIcon, QTextCursor, QAction
-from PySide6.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QApplication, QLabel, QPushButton, QVBoxLayout, \
-    QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit, QWidget, QMessageBox
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QIcon, QAction
+from PySide6.QtWidgets import (
+    QWidget, QMainWindow, QMenu, QSystemTrayIcon, QApplication,
+    QLabel, QPushButton, QVBoxLayout, QHBoxLayout, QSpacerItem,
+    QSizePolicy, QMessageBox, QTableWidget, QTableWidgetItem, QHeaderView,
+)
 from pandas import DataFrame
 
 from models.task_ui import TaskUI
-from services.constants import OPEN_TASK_CSV, TASK_HEADER, CLOCKING_CSV, FIXED_TASK_CSV, CLOCKING_HEADER
-from services.csv_validator import validate_clocking_csv_format
+from services import database as db
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
 from services.config_manager import get_config_manager
@@ -20,15 +20,13 @@ from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
 from windows.settings import SettingsDialog
 
-
-def get_clocking_csv_text() -> str:
-    with open(CLOCKING_CSV, "r") as f:
-        return f.read()
-
-
-def save_clocking_csv_file(text: str) -> None:
-    with open(CLOCKING_CSV, "w") as f:
-        f.write(text)
+# Column indices for the records table
+_COL_DATE = 0
+_COL_TASK = 1
+_COL_IN = 2
+_COL_OUT = 3
+_COL_MSG = 4
+_COLUMNS = ["Date", "Task", "Check In", "Check Out", "Message"]
 
 
 class MainClocking(QMainWindow):
@@ -45,7 +43,6 @@ class MainClocking(QMainWindow):
         summary_action.triggered.connect(self.open_check_clocking)
 
         update_task_action = QAction("Update Open Tasks", self)
-        # open_action.setShortcut('Ctrl+O')
         update_task_action.triggered.connect(self.update_open_tasks)
 
         eod_report_action = QAction("EOD Report", self)
@@ -64,7 +61,7 @@ class MainClocking(QMainWindow):
         menu.addSeparator()
         menu.addAction(settings_action)
         menu.addSeparator()
-        menu.addAction(close_action) 
+        menu.addAction(close_action)
 
         # Initialize tray icon
         self.tray_icon = QSystemTrayIcon(self)
@@ -87,19 +84,16 @@ class MainClocking(QMainWindow):
         exit_action.triggered.connect(QApplication.quit)
         self.tray_menu.addAction(exit_action)
 
-        # Set context menu for tray icon
         self.tray_icon.setContextMenu(self.tray_menu)
-
-        # Show tray icon
         self.tray_icon.show()
 
         self.clocking_window = Clocking(self.tray_icon)
         self.setCentralWidget(self.clocking_window)
-    
+
     def update_open_tasks(self):
         config = get_config_manager()
         is_configured, _ = config.is_jira_configured()
-        
+
         if not is_configured:
             QMessageBox.warning(
                 self,
@@ -107,17 +101,11 @@ class MainClocking(QMainWindow):
                 "Please configure Jira API settings in Menu → Settings to use this feature."
             )
             return
-        
+
         try:
             issues = get_jira_open_issues()
             if len(issues) != 0:
-                output = io.StringIO()
-                writer = csv.writer(output)
-                writer.writerow(TASK_HEADER)
-                for issue in issues:
-                    writer.writerow([issue["task"], issue["description"]])
-                with open(OPEN_TASK_CSV, 'w') as f:
-                    f.write(output.getvalue())
+                db.replace_tasks('open_tasks', [(i["task"], i["description"]) for i in issues])
             self.restart_app()
         except Exception as e:
             QMessageBox.critical(
@@ -137,7 +125,6 @@ class MainClocking(QMainWindow):
     def open_settings(self):
         settings_dialog = SettingsDialog(self)
         if settings_dialog.exec() == SettingsDialog.DialogCode.Accepted:
-            # Settings were saved, ask if user wants to restart
             reply = QMessageBox.question(
                 self,
                 "Restart Required",
@@ -158,10 +145,11 @@ class MainClocking(QMainWindow):
     def tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
             self.showNormal()
-        
+
 
 class Clocking(QWidget):
     EXIT_CODE_REBOOT = 122
+
     def __init__(self, tray_icon: QSystemTrayIcon):
         super().__init__()
         self.tray_icon = tray_icon
@@ -181,34 +169,11 @@ class Clocking(QWidget):
         self.timer.start(1000)
 
     def load_dataframe(self):
-        # Validate CSV before loading
         try:
-            csv_content = get_clocking_csv_text()
-            is_valid, error = validate_clocking_csv_format(csv_content)
-            if not is_valid:
-                self.show_csv_error(f"CSV file is malformed: {error}")
-                # Try to load anyway but user needs to fix it
-                self.dataframe = pd.DataFrame(columns=CLOCKING_HEADER)
-                return
-            dataframe = pd.read_csv(CLOCKING_CSV)
-            dataframe["Date"] = pd.to_datetime(dataframe["Date"], format="%Y-%m-%d", errors="coerce")
-
-            # Build full datetimes using Date + HH:MM time strings for duration calculations.
-            date_part = dataframe["Date"].dt.strftime("%Y-%m-%d")
-            dataframe["Check In"] = pd.to_datetime(
-                date_part + " " + dataframe["Check In"].astype("string"),
-                format="%Y-%m-%d %H:%M",
-                errors="coerce",
-            )
-            dataframe["Check Out"] = pd.to_datetime(
-                date_part + " " + dataframe["Check Out"].astype("string"),
-                format="%Y-%m-%d %H:%M",
-                errors="coerce",
-            )
-            self.dataframe = dataframe
+            self.dataframe = db.get_work_hours_df()
         except Exception as e:
-            self.show_csv_error(f"Failed to load CSV file: {str(e)}")
-            self.dataframe = pd.DataFrame(columns=CLOCKING_HEADER)
+            QMessageBox.critical(None, "Database Error", f"Failed to load records: {str(e)}")
+            self.dataframe = pd.DataFrame(columns=["Date", "Task", "Check In", "Check Out", "Message"])
 
     def setup_ui(self):
         self.setWindowTitle("Clocking")
@@ -221,72 +186,156 @@ class Clocking(QWidget):
         self.update_buttons()
 
         vbox = QVBoxLayout()
+
         hbox = QHBoxLayout()
         hbox.addWidget(QLabel("Timer:"))
         hbox.addWidget(self.timer_clocking_label)
         hbox.addSpacerItem(QSpacerItem(100, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         vbox.addLayout(hbox)
+
         for _, task in self.task_buttons.items():
             hbox = QHBoxLayout()
             hbox.addWidget(task.button)
             hbox.addWidget(task.label)
             vbox.addLayout(hbox)
-        vbox.addWidget(self.btn_stop)
 
-        self.csv_text = QPlainTextEdit()
-        self.update_csv_text()
-        self.save_csv_btn = QPushButton("Update CSV")
-        self.save_csv_btn.clicked.connect(self.save_csv_file)
-        vbox.addWidget(self.csv_text)
-        vbox.addWidget(self.save_csv_btn)
+        vbox.addWidget(self.btn_stop)
+        self.btn_stop.clicked.connect(self.record_check_out)
+
+        # --- Records table ---
+        self.records_table = QTableWidget()
+        self.records_table.setColumnCount(len(_COLUMNS))
+        self.records_table.setHorizontalHeaderLabels(_COLUMNS)
+        self.records_table.horizontalHeader().setSectionResizeMode(
+            _COL_MSG, QHeaderView.ResizeMode.Stretch
+        )
+        self.records_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.records_table.setEditTriggers(QTableWidget.EditTrigger.DoubleClicked)
+        self.refresh_records_table()
+
+        # Table action buttons
+        tbl_btns = QHBoxLayout()
+        self.btn_add_row = QPushButton("Add Row")
+        self.btn_save = QPushButton("Save Changes")
+        self.btn_delete_row = QPushButton("Delete Row")
+        self.btn_refresh = QPushButton("Refresh")
+        self.btn_add_row.clicked.connect(self._add_row)
+        self.btn_save.clicked.connect(self._save_changes)
+        self.btn_delete_row.clicked.connect(self._delete_row)
+        self.btn_refresh.clicked.connect(self._refresh)
+        tbl_btns.addWidget(self.btn_add_row)
+        tbl_btns.addWidget(self.btn_save)
+        tbl_btns.addWidget(self.btn_delete_row)
+        tbl_btns.addWidget(self.btn_refresh)
+
+        vbox.addWidget(self.records_table)
+        vbox.addLayout(tbl_btns)
 
         self.setLayout(vbox)
 
-        self.btn_stop.clicked.connect(self.record_check_out)
+    # ------------------------------------------------------------------
+    # Records table helpers
+    # ------------------------------------------------------------------
 
-    def save_csv_file(self):
-        csv_content = self.csv_text.toPlainText()
-        
-        # Validate CSV format before saving
-        is_valid, error_message = validate_clocking_csv_format(csv_content)
-        
-        if not is_valid:
-            # Show error message to user
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("CSV Validation Error")
-            msg_box.setText("Failed to save CSV file due to validation error.")
-            msg_box.setDetailedText(error_message)
-            msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-            msg_box.exec()
-            return
-        
-        # If validation passes, save the file
-        save_clocking_csv_file(csv_content)
+    def refresh_records_table(self):
+        rows = db.get_work_hours_rows()
+        self.records_table.setRowCount(len(rows))
+        for r, (row_id, date, task, check_in, check_out, message) in enumerate(rows):
+            self._set_table_row(r, row_id, date, task, check_in, check_out or '', message or '')
+
+    def _set_table_row(self, r: int, row_id: Optional[int],
+                       date: str, task: str, check_in: str,
+                       check_out: str, message: str):
+        date_item = QTableWidgetItem(date)
+        if row_id is not None:
+            date_item.setData(Qt.ItemDataRole.UserRole, row_id)
+        self.records_table.setItem(r, _COL_DATE, date_item)
+
+        task_item = QTableWidgetItem(task)
+        task_item.setFlags(task_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.records_table.setItem(r, _COL_TASK, task_item)
+
+        self.records_table.setItem(r, _COL_IN, QTableWidgetItem(check_in))
+        self.records_table.setItem(r, _COL_OUT, QTableWidgetItem(check_out))
+        self.records_table.setItem(r, _COL_MSG, QTableWidgetItem(message))
+
+    def _add_row(self):
+        today = datetime.date.today().isoformat()
+        r = self.records_table.rowCount()
+        self.records_table.insertRow(r)
+        # No row_id yet — will be assigned on save
+        self._set_table_row(r, None, today, '', '', '', '')
+        # Task column needs to be editable for new rows
+        task_item = self.records_table.item(r, _COL_TASK)
+        task_item.setFlags(task_item.flags() | Qt.ItemFlag.ItemIsEditable)
+        self.records_table.scrollToBottom()
+        self.records_table.editItem(self.records_table.item(r, _COL_TASK))
+
+    def _save_changes(self):
+        for r in range(self.records_table.rowCount()):
+            date_item = self.records_table.item(r, _COL_DATE)
+            if date_item is None:
+                continue
+            row_id = date_item.data(Qt.ItemDataRole.UserRole)
+            date = (date_item.text() or '').strip()
+            task = (self.records_table.item(r, _COL_TASK).text() or '').strip()
+            check_in = (self.records_table.item(r, _COL_IN).text() or '').strip()
+            check_out = (self.records_table.item(r, _COL_OUT).text() or '').strip()
+            message = (self.records_table.item(r, _COL_MSG).text() or '').strip()
+
+            if not date or not task or not check_in:
+                continue  # skip incomplete rows
+
+            if row_id is not None:
+                db.update_work_hours_row(row_id, date, task, check_in, check_out, message)
+            else:
+                new_id = db.insert_work_hours_row(date, task, check_in, check_out, message)
+                date_item.setData(Qt.ItemDataRole.UserRole, new_id)
+                # Make Task read-only now that it's persisted
+                task_item = self.records_table.item(r, _COL_TASK)
+                task_item.setFlags(task_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+
         self.load_dataframe()
         self.update_buttons()
-        
-        # Show success message
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle("CSV Saved")
-        msg_box.setText("CSV file has been successfully validated and saved.")
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
 
-    def update_csv_text(self):
-        self.csv_text.setPlainText(get_clocking_csv_text())
-        cursor = self.csv_text.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self.csv_text.setTextCursor(cursor)
+    def _delete_row(self):
+        selected = self.records_table.selectedItems()
+        if not selected:
+            return
+        r = self.records_table.currentRow()
+        check_out_item = self.records_table.item(r, _COL_OUT)
+        if check_out_item and check_out_item.text().strip() == '':
+            QMessageBox.warning(
+                self,
+                "Cannot Delete",
+                "This row is an active clocking session. Please stop the timer before deleting it."
+            )
+            return
+
+        date_item = self.records_table.item(r, _COL_DATE)
+        row_id = date_item.data(Qt.ItemDataRole.UserRole) if date_item else None
+        if row_id is not None:
+            db.delete_work_hours_row(row_id)
+        self.records_table.removeRow(r)
+        self.load_dataframe()
+        self.update_buttons()
+
+    def _refresh(self):
+        self.refresh_records_table()
+        self.load_dataframe()
+        self.update_buttons()
+
+    # ------------------------------------------------------------------
+    # Task buttons
+    # ------------------------------------------------------------------
 
     def create_task_buttons(self):
         self.task_buttons = {}
-        self.create_buttons_from_csv(OPEN_TASK_CSV)
-        self.create_buttons_from_csv(FIXED_TASK_CSV)
+        self._create_buttons_from_table('open_tasks')
+        self._create_buttons_from_table('fixed_tasks')
 
-    def create_buttons_from_csv(self, task_csv: str):
-        task_df = pd.read_csv(task_csv, names=TASK_HEADER, header=0)
+    def _create_buttons_from_table(self, table: str):
+        task_df = db.get_tasks_df(table)
         for _, task in task_df.iterrows():
             task_id = task['Task']
             btn_check_in = QPushButton(task_id)
@@ -300,58 +349,62 @@ class Clocking(QWidget):
             task.button.setEnabled(True)
         if self.started_task_id:
             self.task_buttons[self.started_task_id].button.setEnabled(self._is_checked_out)
-
         self.btn_stop.setEnabled(not self._is_checked_out)
+
+    # ------------------------------------------------------------------
+    # Clocking operations
+    # ------------------------------------------------------------------
 
     def record_check_in(self, task_id: str) -> Callable:
         def do_check_in():
             if not self._is_checked_out:
                 self.record_check_out()
-            with open(CLOCKING_CSV, "a") as f:
-                current_time = datetime.datetime.now()
-                f.write("{},{},{},,\n".format(current_time.date(), task_id, current_time.time().strftime("%H:%M")))
+            current_time = datetime.datetime.now()
+            db.append_check_in(
+                current_time.date().isoformat(),
+                task_id,
+                current_time.time().strftime("%H:%M"),
+            )
             self.load_dataframe()
             self.started_task_id = task_id
             self.update_buttons()
-            self.update_csv_text()
+            self.refresh_records_table()
         return do_check_in
 
     def record_check_out(self):
-        with open(CLOCKING_CSV, "r+") as f:
-            lines = f.readlines()
-            if len(lines) == 0:
-                return
-            last_line = lines[-1].rstrip('\n').split(',')
-            if len(last_line) == 5 and last_line[3] == '':
-                started_date = last_line[0]
-                now_datetime = datetime.datetime.now()
-                end_date = now_datetime.date().isoformat()
-                end_time = now_datetime.time().strftime("%H:%M")
-                if started_date == end_date:
-                    last_line[3] = end_time
-                    lines[-1] = ','.join(last_line) + '\n'
-                else:
-                    last_line[3] = '23:59'
-                    lines[-1] = ','.join(last_line) + '\n'
-                    task_key = last_line[1]
-                    lines.append(f'{end_date},{task_key},00:00,{end_time}\n')
-                f.seek(0)
-                f.writelines(lines)
-            else:
-                return
+        session = db.get_active_session()
+        if session is None:
+            return
+        row_id, started_date, task_key, _ = session
+        now = datetime.datetime.now()
+        end_date = now.date().isoformat()
+        end_time = now.time().strftime("%H:%M")
+
+        conn = db.get_connection()
+        if started_date == end_date:
+            with conn:
+                conn.execute(
+                    "UPDATE work_hours SET check_out = ? WHERE id = ?",
+                    (end_time, row_id),
+                )
+        else:
+            with conn:
+                conn.execute(
+                    "UPDATE work_hours SET check_out = '23:59' WHERE id = ?",
+                    (row_id,),
+                )
+                conn.execute(
+                    "INSERT INTO work_hours (date, task, check_in, check_out, message) VALUES (?, ?, '00:00', ?, '')",
+                    (end_date, task_key, end_time),
+                )
+
         self.load_dataframe()
         self.update_buttons()
-        self.update_csv_text()
+        self.refresh_records_table()
 
-    def show_csv_error(self, message: str):
-        """Display CSV error to user."""
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle("CSV Error")
-        msg_box.setText(message)
-        msg_box.setInformativeText("Please fix the CSV file manually or it may cause data corruption.")
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
+    # ------------------------------------------------------------------
+    # Timer & overtime
+    # ------------------------------------------------------------------
 
     def update_time(self):
         self.worked_hours = self.get_today_worked_hours()
