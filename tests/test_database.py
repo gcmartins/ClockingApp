@@ -290,7 +290,7 @@ class TestTasksCRUD:
         cur = isolated_db.execute("SELECT task, source FROM tasks ORDER BY task")
         rows = {r[0]: r[1] for r in cur.fetchall()}
         assert rows.get("FIX-1") == 'fixed'
-        assert "OLD-JIRA" not in rows
+        assert rows.get("OLD-JIRA") == 'archived'
         assert rows.get("NEW-JIRA") == 'jira'
 
     def test_get_tasks_df_columns(self, isolated_db):
