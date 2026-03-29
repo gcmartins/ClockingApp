@@ -244,10 +244,10 @@ def delete_work_hours_row(row_id: int) -> None:
 # ---------------------------------------------------------------------------
 
 def get_tasks_df() -> pd.DataFrame:
-    """Return a DataFrame with columns Task, Description for all tasks."""
+    """Return a DataFrame with columns Task, Description for active (non-archived) tasks."""
     conn = get_connection()
     df = pd.read_sql_query(
-        "SELECT task, description FROM tasks ORDER BY source, task", conn
+        "SELECT task, description FROM tasks WHERE source != 'archived' ORDER BY source, task", conn
     )
     df.columns = ["Task", "Description"]
     return df
@@ -291,10 +291,21 @@ def delete_task(task: str) -> None:
 
 
 def replace_jira_tasks(rows: list[tuple[str, str]]) -> None:
-    """Atomically replace all Jira-sourced tasks."""
+    """Sync Jira tasks: upsert returned tasks as 'jira', archive existing ones not returned."""
     conn = get_connection()
+    returned_keys = {task for task, _ in rows}
     with conn:
-        conn.execute("DELETE FROM tasks WHERE source = 'jira'")
+        if returned_keys:
+            conn.execute(
+                "UPDATE tasks SET source = 'archived' WHERE source = 'jira' AND task NOT IN ({})".format(
+                    ",".join("?" * len(returned_keys))
+                ),
+                list(returned_keys),
+            )
+        else:
+            conn.execute("UPDATE tasks SET source = 'archived' WHERE source = 'jira'")
         conn.executemany(
-            "INSERT INTO tasks (task, description, source) VALUES (?, ?, 'jira')", rows
+            "INSERT INTO tasks (task, description, source) VALUES (?, ?, 'jira') "
+            "ON CONFLICT(task) DO UPDATE SET description = excluded.description, source = 'jira'",
+            rows,
         )
