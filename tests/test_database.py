@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import textwrap
-from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -9,8 +8,9 @@ import pytest
 import services.database as db_module
 from services.database import (
     _create_tables,
+    _migrate_schema,
     _migrate_work_hours,
-    _migrate_tasks,
+    _migrate_tasks_csv,
     get_work_hours_df,
     get_work_hours_rows,
     append_check_in,
@@ -20,7 +20,11 @@ from services.database import (
     update_work_hours_row,
     delete_work_hours_row,
     get_tasks_df,
-    replace_tasks,
+    get_task_rows,
+    insert_task,
+    update_task,
+    delete_task,
+    replace_jira_tasks,
 )
 
 
@@ -49,10 +53,15 @@ class TestDBInit:
             "SELECT name FROM sqlite_master WHERE type='table'"
         )
         tables = {r[0] for r in cur.fetchall()}
-        assert {"work_hours", "fixed_tasks", "open_tasks"}.issubset(tables)
+        assert {"work_hours", "tasks"}.issubset(tables)
+
+    def test_old_tables_not_present(self, isolated_db):
+        cur = isolated_db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('fixed_tasks','open_tasks')"
+        )
+        assert cur.fetchall() == []
 
     def test_create_tables_idempotent(self, isolated_db):
-        # calling again must not raise
         _create_tables(isolated_db)
         _create_tables(isolated_db)
 
@@ -61,11 +70,49 @@ class TestDBInit:
         cols = {r[1] for r in cur.fetchall()}
         assert {"id", "date", "task", "check_in", "check_out", "message"} == cols
 
-    def test_task_table_schema(self, isolated_db):
-        for table in ("fixed_tasks", "open_tasks"):
-            cur = isolated_db.execute(f"PRAGMA table_info({table})")
-            cols = {r[1] for r in cur.fetchall()}
-            assert {"task", "description"} == cols
+    def test_tasks_schema(self, isolated_db):
+        cur = isolated_db.execute("PRAGMA table_info(tasks)")
+        cols = {r[1] for r in cur.fetchall()}
+        assert {"task", "description", "source"} == cols
+
+
+# ---------------------------------------------------------------------------
+# TestSchemaMigration (legacy fixed_tasks / open_tasks → tasks)
+# ---------------------------------------------------------------------------
+
+class TestSchemaMigration:
+    def _seed_old_tables(self, conn):
+        conn.execute("CREATE TABLE IF NOT EXISTS fixed_tasks (task TEXT PRIMARY KEY, description TEXT DEFAULT '')")
+        conn.execute("CREATE TABLE IF NOT EXISTS open_tasks  (task TEXT PRIMARY KEY, description TEXT DEFAULT '')")
+        conn.execute("INSERT INTO fixed_tasks VALUES ('FIX-1', 'Fixed desc')")
+        conn.execute("INSERT INTO open_tasks  VALUES ('JIRA-1', 'Jira desc')")
+        conn.commit()
+
+    def test_old_rows_merged_into_tasks(self, isolated_db):
+        self._seed_old_tables(isolated_db)
+        _migrate_schema(isolated_db)
+        cur = isolated_db.execute("SELECT task, source FROM tasks ORDER BY task")
+        rows = {r[0]: r[1] for r in cur.fetchall()}
+        assert rows.get('FIX-1') == 'fixed'
+        assert rows.get('JIRA-1') == 'jira'
+
+    def test_old_tables_dropped_after_migration(self, isolated_db):
+        self._seed_old_tables(isolated_db)
+        _migrate_schema(isolated_db)
+        cur = isolated_db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('fixed_tasks','open_tasks')"
+        )
+        assert cur.fetchall() == []
+
+    def test_migration_skipped_when_tasks_already_populated(self, isolated_db):
+        self._seed_old_tables(isolated_db)
+        insert_task('EXISTING', 'already here')
+        _migrate_schema(isolated_db)
+        cur = isolated_db.execute("SELECT task FROM tasks")
+        tasks = {r[0] for r in cur.fetchall()}
+        # Old rows NOT imported because tasks table was non-empty
+        assert 'FIX-1' not in tasks
+        assert 'EXISTING' in tasks
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +137,7 @@ class TestCSVMigration:
         rows = cur.fetchall()
         assert len(rows) == 2
         assert rows[0] == ("2024-01-10", "TASK-1", "09:00", "17:00", "did stuff")
-        assert rows[1][3] is None  # active session → NULL
+        assert rows[1][3] is None
 
     def test_migrate_creates_bak_file(self, isolated_db, tmp_path, monkeypatch):
         csv = tmp_path / "work_hours.csv"
@@ -100,21 +147,29 @@ class TestCSVMigration:
         assert not csv.exists()
         assert (tmp_path / "work_hours.csv.bak").exists()
 
-    def test_migrate_tasks(self, isolated_db, tmp_path, monkeypatch):
+    def test_migrate_tasks_csv_fixed(self, isolated_db, tmp_path, monkeypatch):
         csv = tmp_path / "fixed_tasks.csv"
         self._write(csv, "Task,Description\nTASK-1,Do something\n")
         monkeypatch.chdir(tmp_path)
-        _migrate_tasks(isolated_db, str(csv), "fixed_tasks")
+        _migrate_tasks_csv(isolated_db, str(csv), 'fixed')
 
-        cur = isolated_db.execute("SELECT task, description FROM fixed_tasks")
-        assert cur.fetchone() == ("TASK-1", "Do something")
+        cur = isolated_db.execute("SELECT task, description, source FROM tasks")
+        assert cur.fetchone() == ("TASK-1", "Do something", "fixed")
         assert not csv.exists()
+
+    def test_migrate_tasks_csv_jira(self, isolated_db, tmp_path, monkeypatch):
+        csv = tmp_path / "open_tasks.csv"
+        self._write(csv, "Task,Description\nJIRA-1,Fix bug\n")
+        monkeypatch.chdir(tmp_path)
+        _migrate_tasks_csv(isolated_db, str(csv), 'jira')
+
+        cur = isolated_db.execute("SELECT source FROM tasks WHERE task='JIRA-1'")
+        assert cur.fetchone()[0] == 'jira'
 
     def test_migrate_missing_csv_is_silent(self, isolated_db, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        # Should not raise
         _migrate_work_hours(isolated_db)
-        _migrate_tasks(isolated_db, "nonexistent.csv", "fixed_tasks")
+        _migrate_tasks_csv(isolated_db, "nonexistent.csv", 'fixed')
 
 
 # ---------------------------------------------------------------------------
@@ -206,23 +261,51 @@ class TestWorkHoursCRUD:
 # ---------------------------------------------------------------------------
 
 class TestTasksCRUD:
-    @pytest.mark.parametrize("table", ["fixed_tasks", "open_tasks"])
-    def test_replace_and_get(self, isolated_db, table):
-        replace_tasks(table, [("T-1", "Desc 1"), ("T-2", "Desc 2")])
-        df = get_tasks_df(table)
-        assert list(df["Task"]) == ["T-1", "T-2"]
-        assert list(df["Description"]) == ["Desc 1", "Desc 2"]
+    def test_insert_and_get_fixed(self, isolated_db):
+        insert_task("T-1", "Desc 1")
+        df = get_tasks_df()
+        assert "T-1" in df["Task"].values
 
-    @pytest.mark.parametrize("table", ["fixed_tasks", "open_tasks"])
-    def test_replace_is_atomic(self, isolated_db, table):
-        replace_tasks(table, [("T-OLD", "old")])
-        replace_tasks(table, [("T-NEW", "new")])
-        df = get_tasks_df(table)
-        assert len(df) == 1
-        assert df["Task"].iloc[0] == "T-NEW"
+    def test_insert_and_get_jira(self, isolated_db):
+        insert_task("JIRA-1", "Jira desc", source='jira')
+        rows = get_task_rows()
+        assert any(r[0] == 'JIRA-1' and r[2] == 'jira' for r in rows)
 
-    def test_get_tasks_df_empty_table(self, isolated_db):
-        df = get_tasks_df("fixed_tasks")
+    def test_update_task_description(self, isolated_db):
+        insert_task("T-1", "old")
+        update_task("T-1", "new")
+        cur = isolated_db.execute("SELECT description FROM tasks WHERE task='T-1'")
+        assert cur.fetchone()[0] == "new"
+
+    def test_delete_task(self, isolated_db):
+        insert_task("T-1", "desc")
+        delete_task("T-1")
+        cur = isolated_db.execute("SELECT COUNT(*) FROM tasks WHERE task='T-1'")
+        assert cur.fetchone()[0] == 0
+
+    def test_replace_jira_tasks_only_replaces_jira(self, isolated_db):
+        insert_task("FIX-1", "keep me", source='fixed')
+        insert_task("OLD-JIRA", "old", source='jira')
+        replace_jira_tasks([("NEW-JIRA", "new jira")])
+        cur = isolated_db.execute("SELECT task, source FROM tasks ORDER BY task")
+        rows = {r[0]: r[1] for r in cur.fetchall()}
+        assert rows.get("FIX-1") == 'fixed'
+        assert "OLD-JIRA" not in rows
+        assert rows.get("NEW-JIRA") == 'jira'
+
+    def test_get_tasks_df_columns(self, isolated_db):
+        df = get_tasks_df()
+        assert list(df.columns) == ["Task", "Description"]
+
+    def test_get_task_rows_includes_source(self, isolated_db):
+        insert_task("T-1", "desc", 'fixed')
+        rows = get_task_rows()
+        assert len(rows) == 1
+        task, description, source = rows[0]
+        assert (task, description, source) == ("T-1", "desc", "fixed")
+
+    def test_get_tasks_df_empty(self, isolated_db):
+        df = get_tasks_df()
         assert len(df) == 0
         assert list(df.columns) == ["Task", "Description"]
 
@@ -233,7 +316,6 @@ class TestTasksCRUD:
 
 class TestActiveSession:
     def test_multiday_checkout_creates_two_rows(self, isolated_db):
-        # Simulate a check-in on a previous date
         isolated_db.execute(
             "INSERT INTO work_hours (date, task, check_in, check_out) "
             "VALUES ('2024-03-01', 'TASK-1', '23:00', NULL)"

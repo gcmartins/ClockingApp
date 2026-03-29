@@ -36,26 +36,46 @@ CREATE TABLE IF NOT EXISTS work_hours (
 )
 """
 
-_CREATE_FIXED_TASKS = """
-CREATE TABLE IF NOT EXISTS fixed_tasks (
+_CREATE_TASKS = """
+CREATE TABLE IF NOT EXISTS tasks (
     task        TEXT PRIMARY KEY,
-    description TEXT DEFAULT ''
-)
-"""
-
-_CREATE_OPEN_TASKS = """
-CREATE TABLE IF NOT EXISTS open_tasks (
-    task        TEXT PRIMARY KEY,
-    description TEXT DEFAULT ''
+    description TEXT DEFAULT '',
+    source      TEXT NOT NULL DEFAULT 'fixed'
 )
 """
 
 
 def _create_tables(conn: sqlite3.Connection) -> None:
     conn.execute(_CREATE_WORK_HOURS)
-    conn.execute(_CREATE_FIXED_TASKS)
-    conn.execute(_CREATE_OPEN_TASKS)
+    conn.execute(_CREATE_TASKS)
     conn.commit()
+    _migrate_schema(conn)
+
+
+def _migrate_schema(conn: sqlite3.Connection) -> None:
+    """Merge legacy fixed_tasks / open_tasks tables into the unified tasks table."""
+    cur = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('fixed_tasks', 'open_tasks')"
+    )
+    old_tables = {r[0] for r in cur.fetchall()}
+    if not old_tables:
+        return
+    tasks_empty = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0] == 0
+    if tasks_empty:
+        with conn:
+            if 'fixed_tasks' in old_tables:
+                conn.execute(
+                    "INSERT OR IGNORE INTO tasks (task, description, source) "
+                    "SELECT task, description, 'fixed' FROM fixed_tasks"
+                )
+            if 'open_tasks' in old_tables:
+                conn.execute(
+                    "INSERT OR IGNORE INTO tasks (task, description, source) "
+                    "SELECT task, description, 'jira' FROM open_tasks"
+                )
+    with conn:
+        for t in old_tables:
+            conn.execute(f"DROP TABLE IF EXISTS {t}")
 
 
 # ---------------------------------------------------------------------------
@@ -74,8 +94,8 @@ def init_db() -> None:
 def migrate_from_csv(conn: sqlite3.Connection) -> None:
     """One-time import of legacy CSV data into the database."""
     _migrate_work_hours(conn)
-    _migrate_tasks(conn, FIXED_TASK_CSV, 'fixed_tasks')
-    _migrate_tasks(conn, OPEN_TASK_CSV, 'open_tasks')
+    _migrate_tasks_csv(conn, FIXED_TASK_CSV, 'fixed')
+    _migrate_tasks_csv(conn, OPEN_TASK_CSV, 'jira')
 
 
 def _migrate_work_hours(conn: sqlite3.Connection) -> None:
@@ -101,7 +121,7 @@ def _migrate_work_hours(conn: sqlite3.Connection) -> None:
         print(f"Warning: could not migrate {CLOCKING_CSV}: {e}", file=sys.stderr)
 
 
-def _migrate_tasks(conn: sqlite3.Connection, csv_path: str, table: str) -> None:
+def _migrate_tasks_csv(conn: sqlite3.Connection, csv_path: str, source: str) -> None:
     if not os.path.exists(csv_path):
         return
     try:
@@ -110,8 +130,8 @@ def _migrate_tasks(conn: sqlite3.Connection, csv_path: str, table: str) -> None:
             for _, row in df.iterrows():
                 desc = row['Description'] if not pd.isna(row['Description']) else ''
                 conn.execute(
-                    f"INSERT OR REPLACE INTO {table} (task, description) VALUES (?, ?)",
-                    (str(row['Task']).strip(), str(desc)),
+                    "INSERT OR REPLACE INTO tasks (task, description, source) VALUES (?, ?, ?)",
+                    (str(row['Task']).strip(), str(desc), source),
                 )
         os.rename(csv_path, csv_path + '.bak')
     except Exception as e:
@@ -220,22 +240,61 @@ def delete_work_hours_row(row_id: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Tasks
+# Tasks — read
 # ---------------------------------------------------------------------------
 
-def get_tasks_df(table: str) -> pd.DataFrame:
-    """Return a DataFrame with columns Task, Description for fixed_tasks or open_tasks."""
+def get_tasks_df() -> pd.DataFrame:
+    """Return a DataFrame with columns Task, Description for all tasks."""
     conn = get_connection()
-    df = pd.read_sql_query(f"SELECT task, description FROM {table}", conn)
+    df = pd.read_sql_query(
+        "SELECT task, description FROM tasks ORDER BY source, task", conn
+    )
     df.columns = ["Task", "Description"]
     return df
 
 
-def replace_tasks(table: str, rows: list[tuple[str, str]]) -> None:
-    """Atomically replace all rows in the given task table."""
+def get_task_rows() -> list[tuple]:
+    """Return raw (task, description, source) tuples for the task editor table."""
+    conn = get_connection()
+    cur = conn.execute(
+        "SELECT task, description, source FROM tasks ORDER BY source, task"
+    )
+    return cur.fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Tasks — write
+# ---------------------------------------------------------------------------
+
+def insert_task(task: str, description: str, source: str = 'fixed') -> None:
     conn = get_connection()
     with conn:
-        conn.execute(f"DELETE FROM {table}")
+        conn.execute(
+            "INSERT OR REPLACE INTO tasks (task, description, source) VALUES (?, ?, ?)",
+            (task, description, source),
+        )
+
+
+def update_task(task: str, description: str) -> None:
+    conn = get_connection()
+    with conn:
+        conn.execute(
+            "UPDATE tasks SET description = ? WHERE task = ?",
+            (description, task),
+        )
+
+
+def delete_task(task: str) -> None:
+    conn = get_connection()
+    with conn:
+        conn.execute("DELETE FROM tasks WHERE task = ?", (task,))
+
+
+def replace_jira_tasks(rows: list[tuple[str, str]]) -> None:
+    """Atomically replace all Jira-sourced tasks."""
+    conn = get_connection()
+    with conn:
+        conn.execute("DELETE FROM tasks WHERE source = 'jira'")
         conn.executemany(
-            f"INSERT INTO {table} (task, description) VALUES (?, ?)", rows
+            "INSERT INTO tasks (task, description, source) VALUES (?, ?, 'jira')", rows
         )

@@ -19,6 +19,7 @@ from services.config_manager import get_config_manager
 from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
 from windows.settings import SettingsDialog
+from windows.task_editor import TaskEditor
 
 # Column indices for the records table
 _COL_DATE = 0
@@ -48,6 +49,9 @@ class MainClocking(QMainWindow):
         eod_report_action = QAction("EOD Report", self)
         eod_report_action.triggered.connect(self.generate_eod_report)
 
+        manage_tasks_action = QAction("Manage Tasks", self)
+        manage_tasks_action.triggered.connect(self.open_task_editor)
+
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.open_settings)
 
@@ -57,6 +61,7 @@ class MainClocking(QMainWindow):
 
         menu.addAction(summary_action)
         menu.addAction(update_task_action)
+        menu.addAction(manage_tasks_action)
         menu.addAction(eod_report_action)
         menu.addSeparator()
         menu.addAction(settings_action)
@@ -105,7 +110,7 @@ class MainClocking(QMainWindow):
         try:
             issues = get_jira_open_issues()
             if len(issues) != 0:
-                db.replace_tasks('open_tasks', [(i["task"], i["description"]) for i in issues])
+                db.replace_jira_tasks([(i["task"], i["description"]) for i in issues])
             self.restart_app()
         except Exception as e:
             QMessageBox.critical(
@@ -113,6 +118,10 @@ class MainClocking(QMainWindow):
                 "Failed to Update Tasks",
                 f"Error updating open tasks from Jira: {str(e)}"
             )
+
+    def open_task_editor(self):
+        self.task_editor_window = TaskEditor()
+        self.task_editor_window.show()
 
     def open_check_clocking(self):
         self.check_clocking_window = ClockingSummary(self.clocking_window.dataframe)
@@ -331,12 +340,7 @@ class Clocking(QWidget):
 
     def create_task_buttons(self):
         self.task_buttons = {}
-        self._create_buttons_from_table('open_tasks')
-        self._create_buttons_from_table('fixed_tasks')
-
-    def _create_buttons_from_table(self, table: str):
-        task_df = db.get_tasks_df(table)
-        for _, task in task_df.iterrows():
+        for _, task in db.get_tasks_df().iterrows():
             task_id = task['Task']
             btn_check_in = QPushButton(task_id)
             btn_check_in.setFixedWidth(100)

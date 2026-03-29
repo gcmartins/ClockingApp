@@ -64,9 +64,7 @@ class EodReport(QWidget):
 
     def get_task_descriptions(self):
         task_descriptions = {}
-        for _, data in db.get_tasks_df('open_tasks').iterrows():
-            task_descriptions[data["Task"]] = data["Description"]
-        for _, data in db.get_tasks_df('fixed_tasks').iterrows():
+        for _, data in db.get_tasks_df().iterrows():
             task_descriptions[data["Task"]] = data["Description"]
         return task_descriptions
 
