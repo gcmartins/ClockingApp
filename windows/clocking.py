@@ -34,13 +34,7 @@ def get_all_task_ids() -> list:
             ids.extend(df["Task"].dropna().astype(str).tolist())
         except Exception:
             pass
-    seen = set()
-    result = []
-    for tid in ids:
-        if tid not in seen:
-            seen.add(tid)
-            result.append(tid)
-    return result
+    return list(dict.fromkeys(ids))
 
 
 class TaskComboDelegate(QStyledItemDelegate):
