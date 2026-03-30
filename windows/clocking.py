@@ -287,7 +287,11 @@ class Clocking(QWidget):
         self.csv_table.setColumnCount(len(CLOCKING_HEADER))
         self.csv_table.setHorizontalHeaderLabels(CLOCKING_HEADER)
         self.csv_table.setItemDelegateForColumn(1, self._task_delegate)
-        self.csv_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        header = self.csv_table.horizontalHeader()
+        for col in range(len(CLOCKING_HEADER)):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        message_col = CLOCKING_HEADER.index("Message")
+        header.setSectionResizeMode(message_col, QHeaderView.ResizeMode.Stretch)
         self.csv_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.csv_table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked |
