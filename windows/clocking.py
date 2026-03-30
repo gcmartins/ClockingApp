@@ -1,6 +1,7 @@
 import csv
 import datetime
 import io
+import logging
 from typing import Optional, Callable
 
 import pandas as pd
@@ -35,8 +36,7 @@ def get_all_task_ids() -> list:
         except FileNotFoundError:
             pass  # It's okay if a task file doesn't exist.
         except Exception as e:
-            # Consider using a proper logger instead of print
-            print(f"Error processing task file {csv_path}: {e}")
+            logging.error(f"Error processing task file {csv_path}: {e}")
     return list(dict.fromkeys(ids))
 
 
