@@ -265,7 +265,8 @@ class Clocking(QWidget):
         save_clocking_csv_file(csv_content)
         self.load_dataframe()
         self.update_buttons()
-        
+        self.update_csv_text()
+
         # Show success message
         msg_box = QMessageBox()
         msg_box.setIcon(QMessageBox.Icon.Information)
@@ -334,7 +335,7 @@ class Clocking(QWidget):
                     last_line[3] = '23:59'
                     lines[-1] = ','.join(last_line) + '\n'
                     task_key = last_line[1]
-                    lines.append(f'{end_date},{task_key},00:00,{end_time}\n')
+                    lines.append(f'{end_date},{task_key},00:00,{end_time},\n')
                 f.seek(0)
                 f.writelines(lines)
             else:
