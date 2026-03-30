@@ -5,7 +5,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
 
 import pandas as pd
 
-from services.constants import OPEN_TASK_CSV, TASK_HEADER, FIXED_TASK_CSV
+from services.constants import TASKS_CSV, TASK_HEADER
 
 
 class EodReport(QWidget):
@@ -63,16 +63,11 @@ class EodReport(QWidget):
         self.report_text.append(report)
 
     def get_task_descriptions(self):
-        open_task_df = pd.read_csv(OPEN_TASK_CSV, names=TASK_HEADER, header=0)
-        fixed_task_df = pd.read_csv(FIXED_TASK_CSV, names=TASK_HEADER, header=0)
-        task_descriptions = {}
-        for _, data in open_task_df.iterrows():
-            task_descriptions[data["Task"]] = data["Description"]
-
-        for _, data in fixed_task_df.iterrows():
-            task_descriptions[data["Task"]] = data["Description"]
-
-        return task_descriptions
+        try:
+            task_df = pd.read_csv(TASKS_CSV, names=TASK_HEADER, header=0)
+        except FileNotFoundError:
+            return {}
+        return {row["Task"]: row["Description"] for _, row in task_df.iterrows()}
 
 
 
