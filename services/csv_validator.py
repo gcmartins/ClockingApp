@@ -148,22 +148,26 @@ def validate_clocking_csv_format(csv_content: str) -> Tuple[bool, Optional[str]]
             
             date_str, task, check_in, check_out, message = row
             
-            # Validate date
-            if date_str and not validate_date_format(date_str):
+            # Validate date (must be present and valid)
+            if not date_str:
+                return False, f"Row {row_num}: Date field is empty"
+            if not validate_date_format(date_str):
                 return False, f"Row {row_num}: Invalid date format '{date_str}'. Expected YYYY-MM-DD"
-            
+
             # Validate task (should not be empty)
             if not task or task.strip() == '':
                 return False, f"Row {row_num}: Task field is empty"
-            
-            # Validate check in time
-            if check_in and not validate_time_format(check_in):
+
+            # Validate check in time (must be present)
+            if not check_in:
+                return False, f"Row {row_num}: Check-in time is missing"
+            if not validate_time_format(check_in):
                 return False, f"Row {row_num}: Invalid check-in time format '{check_in}'. Expected HH:MM"
-            
+
             # Validate check out time
             if check_out and not validate_time_format(check_out):
                 return False, f"Row {row_num}: Invalid check-out time format '{check_out}'. Expected HH:MM"
-            
+
             # Validate that check out is not before check in (if both present)
             if check_in and check_out:
                 check_in_dt = datetime.datetime.strptime(check_in, "%H:%M")

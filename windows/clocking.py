@@ -1,13 +1,18 @@
 import csv
 import datetime
 import io
+import logging
 from typing import Optional, Callable
 
 import pandas as pd
-from PySide6.QtCore import QTimer
-from PySide6.QtGui import QIcon, QTextCursor, QAction
-from PySide6.QtWidgets import QWidget, QMainWindow, QMenu, QSystemTrayIcon, QApplication, QLabel, QPushButton, QVBoxLayout, \
-    QHBoxLayout, QSpacerItem, QSizePolicy, QPlainTextEdit, QWidget, QMessageBox
+from PySide6.QtCore import QTimer, Qt
+from PySide6.QtGui import QIcon, QAction
+from PySide6.QtWidgets import (
+    QWidget, QMainWindow, QMenu, QSystemTrayIcon, QApplication, QLabel,
+    QPushButton, QVBoxLayout, QHBoxLayout, QSpacerItem, QSizePolicy,
+    QMessageBox, QTableWidget, QTableWidgetItem, QComboBox,
+    QAbstractItemView, QStyledItemDelegate, QHeaderView
+)
 from pandas import DataFrame
 
 from models.task_ui import TaskUI
@@ -19,6 +24,48 @@ from services.config_manager import get_config_manager
 from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
 from windows.settings import SettingsDialog
+
+
+def get_all_task_ids() -> list:
+    """Return deduplicated task IDs from fixed_tasks.csv then open_tasks.csv."""
+    ids = []
+    for csv_path in (FIXED_TASK_CSV, OPEN_TASK_CSV):
+        try:
+            df = pd.read_csv(csv_path, names=TASK_HEADER, header=0)
+            ids.extend(df["Task"].dropna().astype(str).tolist())
+        except FileNotFoundError:
+            pass  # It's okay if a task file doesn't exist.
+        except Exception as e:
+            logging.error(f"Error processing task file {csv_path}: {e}")
+    return list(dict.fromkeys(ids))
+
+
+class TaskComboDelegate(QStyledItemDelegate):
+    """Delegate that shows an editable QComboBox for the Task column."""
+
+    def __init__(self, task_ids: list, parent=None):
+        super().__init__(parent)
+        self._task_ids = task_ids
+
+    def createEditor(self, parent, option, index):
+        combo = QComboBox(parent)
+        combo.addItems(self._task_ids)
+        combo.setEditable(True)
+        return combo
+
+    def setEditorData(self, editor, index):
+        value = index.data(Qt.ItemDataRole.EditRole) or ""
+        i = editor.findText(value)
+        if i >= 0:
+            editor.setCurrentIndex(i)
+        else:
+            editor.setEditText(value)
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
+
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
 
 def get_clocking_csv_text() -> str:
@@ -233,25 +280,59 @@ class Clocking(QWidget):
             vbox.addLayout(hbox)
         vbox.addWidget(self.btn_stop)
 
-        self.csv_text = QPlainTextEdit()
-        self.update_csv_text()
-        self.save_csv_btn = QPushButton("Update CSV")
-        self.save_csv_btn.clicked.connect(self.save_csv_file)
-        vbox.addWidget(self.csv_text)
-        vbox.addWidget(self.save_csv_btn)
+        task_ids = get_all_task_ids()
+        self._task_delegate = TaskComboDelegate(task_ids, self)
+
+        self.csv_table = QTableWidget()
+        self.csv_table.setColumnCount(len(CLOCKING_HEADER))
+        self.csv_table.setHorizontalHeaderLabels(CLOCKING_HEADER)
+        self.csv_table.setItemDelegateForColumn(1, self._task_delegate)
+        header = self.csv_table.horizontalHeader()
+        for col in range(len(CLOCKING_HEADER)):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        message_col = CLOCKING_HEADER.index("Message")
+        header.setSectionResizeMode(message_col, QHeaderView.ResizeMode.Stretch)
+        self.csv_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.csv_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked |
+            QAbstractItemView.EditTrigger.SelectedClicked |
+            QAbstractItemView.EditTrigger.EditKeyPressed
+        )
+        self.update_csv_table()
+        self.csv_table.itemChanged.connect(self._auto_save)
+
+        self.add_row_btn = QPushButton("Add Row")
+        self.add_row_btn.clicked.connect(self.add_row)
+        self.delete_row_btn = QPushButton("Delete Row")
+        self.delete_row_btn.clicked.connect(self.delete_row)
+
+        btn_hbox = QHBoxLayout()
+        btn_hbox.addWidget(self.add_row_btn)
+        btn_hbox.addWidget(self.delete_row_btn)
+
+        vbox.addWidget(self.csv_table)
+        vbox.addLayout(btn_hbox)
 
         self.setLayout(vbox)
 
         self.btn_stop.clicked.connect(self.record_check_out)
 
-    def save_csv_file(self):
-        csv_content = self.csv_text.toPlainText()
-        
-        # Validate CSV format before saving
+    def _collect_csv_content(self) -> str:
+        output = io.StringIO()
+        writer = csv.writer(output, lineterminator="\n")
+        writer.writerow(CLOCKING_HEADER)
+        for row_idx in range(self.csv_table.rowCount()):
+            row_data = []
+            for col_idx in range(len(CLOCKING_HEADER)):
+                item = self.csv_table.item(row_idx, col_idx)
+                row_data.append(item.text().strip() if item else "")
+            writer.writerow(row_data)
+        return output.getvalue()
+
+    def _auto_save(self):
+        csv_content = self._collect_csv_content()
         is_valid, error_message = validate_clocking_csv_format(csv_content)
-        
         if not is_valid:
-            # Show error message to user
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.setWindowTitle("CSV Validation Error")
@@ -259,26 +340,67 @@ class Clocking(QWidget):
             msg_box.setDetailedText(error_message)
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
+            self.update_csv_table()
             return
-        
-        # If validation passes, save the file
         save_clocking_csv_file(csv_content)
         self.load_dataframe()
         self.update_buttons()
-        
-        # Show success message
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle("CSV Saved")
-        msg_box.setText("CSV file has been successfully validated and saved.")
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
 
-    def update_csv_text(self):
-        self.csv_text.setPlainText(get_clocking_csv_text())
-        cursor = self.csv_text.textCursor()
-        cursor.movePosition(QTextCursor.MoveOperation.End)
-        self.csv_text.setTextCursor(cursor)
+    def update_csv_table(self):
+        try:
+            csv_content = get_clocking_csv_text()
+        except FileNotFoundError:
+            self.csv_table.setRowCount(0)
+            return
+        reader = csv.reader(io.StringIO(csv_content))
+        rows = list(reader)
+        data_rows = [r for r in rows[1:] if any(field.strip() for field in r)]
+        self.csv_table.blockSignals(True)
+        self.csv_table.setRowCount(0)
+        for row_data in data_rows:
+            while len(row_data) < len(CLOCKING_HEADER):
+                row_data.append("")
+            row_idx = self.csv_table.rowCount()
+            self.csv_table.insertRow(row_idx)
+            for col_idx, value in enumerate(row_data[:len(CLOCKING_HEADER)]):
+                self.csv_table.setItem(row_idx, col_idx, QTableWidgetItem(value.strip()))
+        self.csv_table.blockSignals(False)
+        if self.csv_table.rowCount() > 0:
+            self.csv_table.scrollToBottom()
+
+    def add_row(self):
+        row_idx = self.csv_table.rowCount()
+        self.csv_table.blockSignals(True)
+        self.csv_table.insertRow(row_idx)
+        self.csv_table.setItem(row_idx, 0, QTableWidgetItem(datetime.date.today().isoformat()))
+        for col_idx in range(1, len(CLOCKING_HEADER)):
+            self.csv_table.setItem(row_idx, col_idx, QTableWidgetItem(""))
+        self.csv_table.blockSignals(False)
+        self.csv_table.scrollToBottom()
+        self.csv_table.setCurrentCell(row_idx, 1)
+
+    def delete_row(self):
+        selected_rows = sorted(
+            set(index.row() for index in self.csv_table.selectedIndexes()),
+            reverse=True,
+        )
+        if not selected_rows:
+            QMessageBox.information(self, "No Selection", "Please select a row to delete.")
+            return
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            f"Delete {len(selected_rows)} row(s)?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self.csv_table.blockSignals(True)
+        for row_idx in selected_rows:
+            self.csv_table.removeRow(row_idx)
+        self.csv_table.blockSignals(False)
+        self._auto_save()
 
     def create_task_buttons(self):
         self.task_buttons = {}
@@ -313,7 +435,7 @@ class Clocking(QWidget):
             self.load_dataframe()
             self.started_task_id = task_id
             self.update_buttons()
-            self.update_csv_text()
+            self.update_csv_table()
         return do_check_in
 
     def record_check_out(self):
@@ -334,14 +456,14 @@ class Clocking(QWidget):
                     last_line[3] = '23:59'
                     lines[-1] = ','.join(last_line) + '\n'
                     task_key = last_line[1]
-                    lines.append(f'{end_date},{task_key},00:00,{end_time}\n')
+                    lines.append(f'{end_date},{task_key},00:00,{end_time},\n')
                 f.seek(0)
                 f.writelines(lines)
             else:
                 return
         self.load_dataframe()
         self.update_buttons()
-        self.update_csv_text()
+        self.update_csv_table()
 
     def show_csv_error(self, message: str):
         """Display CSV error to user."""
