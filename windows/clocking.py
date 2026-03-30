@@ -299,19 +299,16 @@ class Clocking(QWidget):
             QAbstractItemView.EditTrigger.EditKeyPressed
         )
         self.update_csv_table()
+        self.csv_table.itemChanged.connect(self._auto_save)
 
         self.add_row_btn = QPushButton("Add Row")
         self.add_row_btn.clicked.connect(self.add_row)
         self.delete_row_btn = QPushButton("Delete Row")
         self.delete_row_btn.clicked.connect(self.delete_row)
-        self.save_csv_btn = QPushButton("Update CSV")
-        self.save_csv_btn.clicked.connect(self.save_csv_file)
 
         btn_hbox = QHBoxLayout()
         btn_hbox.addWidget(self.add_row_btn)
         btn_hbox.addWidget(self.delete_row_btn)
-        btn_hbox.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-        btn_hbox.addWidget(self.save_csv_btn)
 
         vbox.addWidget(self.csv_table)
         vbox.addLayout(btn_hbox)
@@ -320,7 +317,7 @@ class Clocking(QWidget):
 
         self.btn_stop.clicked.connect(self.record_check_out)
 
-    def save_csv_file(self):
+    def _collect_csv_content(self) -> str:
         output = io.StringIO()
         writer = csv.writer(output, lineterminator="\n")
         writer.writerow(CLOCKING_HEADER)
@@ -330,8 +327,10 @@ class Clocking(QWidget):
                 item = self.csv_table.item(row_idx, col_idx)
                 row_data.append(item.text().strip() if item else "")
             writer.writerow(row_data)
-        csv_content = output.getvalue()
+        return output.getvalue()
 
+    def _auto_save(self):
+        csv_content = self._collect_csv_content()
         is_valid, error_message = validate_clocking_csv_format(csv_content)
         if not is_valid:
             msg_box = QMessageBox()
@@ -341,19 +340,11 @@ class Clocking(QWidget):
             msg_box.setDetailedText(error_message)
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
+            self.update_csv_table()
             return
-
         save_clocking_csv_file(csv_content)
         self.load_dataframe()
         self.update_buttons()
-        self.update_csv_table()
-
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle("CSV Saved")
-        msg_box.setText("CSV file has been successfully validated and saved.")
-        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg_box.exec()
 
     def update_csv_table(self):
         try:
@@ -364,6 +355,7 @@ class Clocking(QWidget):
         reader = csv.reader(io.StringIO(csv_content))
         rows = list(reader)
         data_rows = [r for r in rows[1:] if any(field.strip() for field in r)]
+        self.csv_table.blockSignals(True)
         self.csv_table.setRowCount(0)
         for row_data in data_rows:
             while len(row_data) < len(CLOCKING_HEADER):
@@ -372,15 +364,18 @@ class Clocking(QWidget):
             self.csv_table.insertRow(row_idx)
             for col_idx, value in enumerate(row_data[:len(CLOCKING_HEADER)]):
                 self.csv_table.setItem(row_idx, col_idx, QTableWidgetItem(value.strip()))
+        self.csv_table.blockSignals(False)
         if self.csv_table.rowCount() > 0:
             self.csv_table.scrollToBottom()
 
     def add_row(self):
         row_idx = self.csv_table.rowCount()
+        self.csv_table.blockSignals(True)
         self.csv_table.insertRow(row_idx)
         self.csv_table.setItem(row_idx, 0, QTableWidgetItem(datetime.date.today().isoformat()))
         for col_idx in range(1, len(CLOCKING_HEADER)):
             self.csv_table.setItem(row_idx, col_idx, QTableWidgetItem(""))
+        self.csv_table.blockSignals(False)
         self.csv_table.scrollToBottom()
         self.csv_table.setCurrentCell(row_idx, 1)
 
@@ -401,8 +396,11 @@ class Clocking(QWidget):
         )
         if confirm != QMessageBox.StandardButton.Yes:
             return
+        self.csv_table.blockSignals(True)
         for row_idx in selected_rows:
             self.csv_table.removeRow(row_idx)
+        self.csv_table.blockSignals(False)
+        self._auto_save()
 
     def create_task_buttons(self):
         self.task_buttons = {}
