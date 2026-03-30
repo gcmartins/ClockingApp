@@ -32,8 +32,11 @@ def get_all_task_ids() -> list:
         try:
             df = pd.read_csv(csv_path, names=TASK_HEADER, header=0)
             ids.extend(df["Task"].dropna().astype(str).tolist())
-        except Exception:
-            pass
+        except FileNotFoundError:
+            pass  # It's okay if a task file doesn't exist.
+        except Exception as e:
+            # Consider using a proper logger instead of print
+            print(f"Error processing task file {csv_path}: {e}")
     return list(dict.fromkeys(ids))
 
 
