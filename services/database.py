@@ -177,12 +177,12 @@ def get_task_durations_for_date(date: str) -> list[TaskDuration]:
     return [_task_duration_from_row(r) for r in rows]
 
 
-def insert_clocking(date: str, task: str, check_in: str) -> None:
-    """Insert a new clocking row (check_out and message left NULL)."""
+def insert_clocking(date: str, task: str, check_in: str, check_out: Optional[str] = None) -> None:
+    """Insert a new clocking row."""
     with _get_connection() as conn:
         conn.execute(
-            "INSERT INTO clockings (date, task, check_in) VALUES (?, ?, ?)",
-            (date, task, check_in),
+            "INSERT INTO clockings (date, task, check_in, check_out) VALUES (?, ?, ?, ?)",
+            (date, task, check_in, check_out),
         )
 
 
