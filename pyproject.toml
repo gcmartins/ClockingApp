@@ -17,11 +17,11 @@ dev = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov=services --cov=models --cov-report=term-missing --cov-report=html:htmlcov"
+addopts = "--cov=services --cov-report=term-missing --cov-report=html:htmlcov"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["services", "models"]
+source = ["services"]
 omit = ["tests/*"]
 
 [tool.coverage.report]

@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
 )
 from pandas import DataFrame
 
-from models.task_ui import TaskUI
 from services.constants import TASKS_CSV, TASK_HEADER, CLOCKING_CSV, CLOCKING_HEADER
 from services.csv_validator import validate_clocking_csv_format
 from services.jira_api import get_jira_open_issues
@@ -25,6 +24,13 @@ from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
 from windows.settings import SettingsDialog
 from windows.task_manager import TaskManagerDialog
+
+class TaskUI:
+    def __init__(self, id: str, description: str, button: QPushButton):
+        self.id = id
+        self.description = description
+        self.button = button
+        self.label = QLabel(self.description)
 
 
 def get_all_task_ids() -> list:
