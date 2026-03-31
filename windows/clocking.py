@@ -482,7 +482,7 @@ class Clocking(QWidget):
         else:
             # Cross-day: close at 23:59, open new row at 00:00
             update_check_out(open_rec.id, f"{started_date} 23:59")
-            insert_clocking(end_date, open_rec.task, f"{end_date} 00:00")
+            insert_clocking(end_date, open_rec.task, f"{end_date} 00:00", f"{end_date} {end_time}")
 
         self.load_data()
         self.update_buttons()
