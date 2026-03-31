@@ -91,7 +91,7 @@ def _migrate_to_sqlite():
                 continue
 
             clocking_rows.append(ClockingRecord(
-                id=0,  # AUTOINCREMENT — will be reassigned by DB
+                id=None,  # AUTOINCREMENT — will be reassigned by DB
                 date=date,
                 task=task,
                 check_in=check_in,
