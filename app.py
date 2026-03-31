@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from windows.clocking import MainClocking
 from services.constants import (
-    TASKS_CSV, FIXED_TASK_CSV, OPEN_TASK_CSV, CLOCKING_CSV,
+    TASKS_CSV, FIXED_TASK_CSV, OPEN_TASK_CSV, CLOCKING_CSV, TASK_TYPES,
 )
 from services.database import (
     init_db, get_all_tasks, save_tasks, save_clockings,
