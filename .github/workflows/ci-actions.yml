@@ -1,0 +1,68 @@
+name: CI actions
+
+permissions:
+  contents: read        # Required for checkout and comparing commits
+  pull-requests: write  # Required for creating/updating PR comments
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  tests:
+    name: Run Linux tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Install Qt system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgl1 \
+            libglib2.0-0 \
+            libdbus-1-3 \
+            libegl1 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-xinerama0 \
+            libxcb-xkb1 \
+            libxkbcommon-x11-0 \
+            xvfb
+
+      - name: Run tests (headless)
+        env:
+          QT_QPA_PLATFORM: xcb
+          LIBGL_ALWAYS_SOFTWARE: 1
+        run: |
+          xvfb-run uv run pytest tests/ \
+            --cov=services --cov=windows \
+            --cov-report=term-missing:skip-covered \
+            --junitxml=pytest.xml | tee pytest-coverage.txt
+
+      - name: Post coverage comment on PR
+        uses: MishaKav/pytest-coverage-comment@v1
+        if: github.event_name == 'pull_request'
+        with:
+          pytest-coverage-path: ./pytest-coverage.txt
+          junitxml-path: ./pytest.xml

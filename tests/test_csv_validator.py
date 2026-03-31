@@ -233,64 +233,79 @@ class TestClockingCSVValidation:
 
 class TestTaskCSVValidation:
     """Test cases for task CSV validation."""
-    
+
     def test_valid_task_csv(self):
         """Test that a valid task CSV passes validation."""
-        valid_csv = """Task,Description
-TASK-123,Implement feature X
-TASK-456,Fix bug in module Y
-TASK-789,Review pull request"""
+        valid_csv = """Task,Description,Task Type
+TASK-123,Implement feature X,fixed
+TASK-456,Fix bug in module Y,open
+TASK-789,Review pull request,closed"""
         is_valid, error = validate_task_csv_format(valid_csv)
         assert is_valid is True, f"Valid task CSV should pass validation. Error: {error}"
         assert error is None
-    
+
     def test_empty_task_csv(self):
         """Test that empty CSV content is rejected."""
         is_valid, error = validate_task_csv_format("")
         assert is_valid is False
         assert "empty" in error.lower()
-    
+
     def test_invalid_task_header(self):
         """Test that invalid headers are rejected."""
-        invalid_csv = """TaskID,TaskDescription
-TASK-123,Implement feature X"""
+        invalid_csv = """TaskID,TaskDescription,Kind
+TASK-123,Implement feature X,fixed"""
         is_valid, error = validate_task_csv_format(invalid_csv)
         assert is_valid is False
         assert "header" in error.lower()
-    
+
     def test_wrong_column_count_in_task(self):
         """Test that rows with wrong number of columns are rejected."""
-        invalid_csv = """Task,Description
+        invalid_csv = """Task,Description,Task Type
 TASK-123"""
         is_valid, error = validate_task_csv_format(invalid_csv)
         assert is_valid is False
         assert "columns" in error.lower()
-    
+
     def test_empty_task_field_in_task_csv(self):
         """Test that empty task fields are rejected."""
-        invalid_csv = """Task,Description
-,Some description"""
+        invalid_csv = """Task,Description,Task Type
+,Some description,fixed"""
         is_valid, error = validate_task_csv_format(invalid_csv)
         assert is_valid is False
         assert "task" in error.lower() and "empty" in error.lower()
-    
+
     def test_task_with_empty_description(self):
         """Test that empty descriptions are allowed."""
-        valid_csv = """Task,Description
-TASK-123,"""
+        valid_csv = """Task,Description,Task Type
+TASK-123,,fixed"""
         is_valid, error = validate_task_csv_format(valid_csv)
         assert is_valid is True, f"Empty description should be allowed. Error: {error}"
         assert error is None
-    
+
     def test_multiple_valid_tasks(self):
         """Test CSV with multiple valid task rows."""
-        valid_csv = """Task,Description
-TASK-123,First task
-TASK-456,Second task
-TASK-789,Third task"""
+        valid_csv = """Task,Description,Task Type
+TASK-123,First task,fixed
+TASK-456,Second task,open
+TASK-789,Third task,closed"""
         is_valid, error = validate_task_csv_format(valid_csv)
         assert is_valid is True, f"Valid task CSV with multiple rows should pass. Error: {error}"
         assert error is None
+
+    def test_all_valid_task_types(self):
+        """Test that all valid task_type values are accepted."""
+        for task_type in ("fixed", "open", "closed"):
+            csv_content = f"Task,Description,Task Type\nTASK-1,desc,{task_type}"
+            is_valid, error = validate_task_csv_format(csv_content)
+            assert is_valid is True, f"task_type '{task_type}' should be valid. Error: {error}"
+
+    def test_invalid_task_type_rejected(self):
+        """Test that an unknown task_type value is rejected."""
+        invalid_csv = """Task,Description,Task Type
+TASK-123,Some description,unknown"""
+        is_valid, error = validate_task_csv_format(invalid_csv)
+        assert is_valid is False
+        assert "task type" in error.lower() or "invalid" in error.lower()
 
 
 class TestEdgeCases:

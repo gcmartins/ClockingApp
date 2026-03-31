@@ -4,7 +4,7 @@ import datetime
 import io
 from typing import List, Tuple, Optional
 
-from services.constants import CLOCKING_HEADER, TASK_HEADER
+from services.constants import CLOCKING_HEADER, TASK_HEADER, TASK_TYPES
 
 
 class CSVValidationError(Exception):
@@ -189,17 +189,18 @@ def validate_clocking_csv_format(csv_content: str) -> Tuple[bool, Optional[str]]
 
 def validate_task_csv_format(csv_content: str) -> Tuple[bool, Optional[str]]:
     """
-    Validate the format of task CSV content (for open_tasks.csv and fixed_tasks.csv).
-    
+    Validate the format of task CSV content (for tasks.csv).
+
     Validates:
     - CSV can be parsed
-    - Header matches expected format
+    - Header matches expected format: ['Task', 'Description', 'Task Type']
     - Each row has correct number of columns
     - Task field is not empty
-    
+    - Task Type value is one of the valid types: fixed, open, closed
+
     Args:
         csv_content: The CSV content as a string
-        
+
     Returns:
         Tuple of (is_valid, error_message)
         - is_valid: True if validation passes, False otherwise
@@ -207,38 +208,45 @@ def validate_task_csv_format(csv_content: str) -> Tuple[bool, Optional[str]]:
     """
     if not csv_content or csv_content.strip() == '':
         return False, "CSV content is empty"
-    
+
     try:
         # Parse CSV
         csv_reader = csv.reader(io.StringIO(csv_content))
         rows = list(csv_reader)
-        
+
         if len(rows) == 0:
             return False, "CSV has no rows"
-        
+
         # Validate header
         header = rows[0]
         if header != TASK_HEADER:
             return False, f"Invalid header. Expected {TASK_HEADER}, got {header}"
-        
+
         # Validate data rows
         for row_num, row in enumerate(rows[1:], start=2):
             # Skip empty rows
             if not any(row):
                 continue
-                
+
             # Check column count
             if len(row) != len(TASK_HEADER):
                 return False, f"Row {row_num}: Expected {len(TASK_HEADER)} columns, got {len(row)}"
-            
-            task, description = row
-            
+
+            task, description, task_type = row
+
             # Validate task (should not be empty)
             if not task or task.strip() == '':
                 return False, f"Row {row_num}: Task field is empty"
-        
+
+            # Validate task_type value
+            if task_type not in TASK_TYPES:
+                return False, (
+                    f"Row {row_num}: Invalid task type '{task_type}'. "
+                    f"Expected one of {TASK_TYPES}"
+                )
+
         return True, None
-        
+
     except csv.Error as e:
         return False, f"CSV parsing error: {str(e)}"
     except Exception as e:

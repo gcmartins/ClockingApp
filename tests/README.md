@@ -57,10 +57,16 @@ The test suite covers:
 - Special characters in fields
 - Whitespace handling
 
-## Test Results
+## Running with Coverage
 
-All 29 tests are passing:
-- 4 date/time validation tests
-- 14 clocking CSV validation tests
-- 7 task CSV validation tests
-- 4 edge case tests
+Coverage is enabled by default via `pyproject.toml`. A simple `pytest` run reports coverage:
+
+```bash
+uv run pytest
+```
+
+To see a quick summary without the HTML report:
+
+```bash
+uv run pytest --no-cov-on-fail --cov-report=term-missing
+```

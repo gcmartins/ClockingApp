@@ -15,8 +15,7 @@ from PySide6.QtWidgets import (
 )
 from pandas import DataFrame
 
-from models.task_ui import TaskUI
-from services.constants import OPEN_TASK_CSV, TASK_HEADER, CLOCKING_CSV, FIXED_TASK_CSV, CLOCKING_HEADER
+from services.constants import TASKS_CSV, TASK_HEADER, CLOCKING_CSV, CLOCKING_HEADER
 from services.csv_validator import validate_clocking_csv_format
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
@@ -24,20 +23,26 @@ from services.config_manager import get_config_manager
 from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
 from windows.settings import SettingsDialog
+from windows.task_manager import TaskManagerDialog
+
+class TaskUI:
+    def __init__(self, id: str, description: str, button: QPushButton):
+        self.id = id
+        self.description = description
+        self.button = button
+        self.label = QLabel(self.description)
 
 
 def get_all_task_ids() -> list:
-    """Return deduplicated task IDs from fixed_tasks.csv then open_tasks.csv."""
-    ids = []
-    for csv_path in (FIXED_TASK_CSV, OPEN_TASK_CSV):
-        try:
-            df = pd.read_csv(csv_path, names=TASK_HEADER, header=0)
-            ids.extend(df["Task"].dropna().astype(str).tolist())
-        except FileNotFoundError:
-            pass  # It's okay if a task file doesn't exist.
-        except Exception as e:
-            logging.error(f"Error processing task file {csv_path}: {e}")
-    return list(dict.fromkeys(ids))
+    """Return deduplicated task IDs from tasks.csv."""
+    try:
+        df = pd.read_csv(TASKS_CSV, names=TASK_HEADER, header=0)
+        return list(dict.fromkeys(df["Task"].dropna().astype(str).tolist()))
+    except FileNotFoundError:
+        return []
+    except Exception as e:
+        logging.error(f"Error processing task file {TASKS_CSV}: {e}")
+        return []
 
 
 class TaskComboDelegate(QStyledItemDelegate):
@@ -95,6 +100,9 @@ class MainClocking(QMainWindow):
         # open_action.setShortcut('Ctrl+O')
         update_task_action.triggered.connect(self.update_open_tasks)
 
+        manage_tasks_action = QAction("Manage Tasks", self)
+        manage_tasks_action.triggered.connect(self.open_task_manager)
+
         eod_report_action = QAction("EOD Report", self)
         eod_report_action.triggered.connect(self.generate_eod_report)
 
@@ -107,6 +115,7 @@ class MainClocking(QMainWindow):
 
         menu.addAction(summary_action)
         menu.addAction(update_task_action)
+        menu.addAction(manage_tasks_action)
         menu.addAction(eod_report_action)
         menu.addSeparator()
         menu.addAction(settings_action)
@@ -146,7 +155,7 @@ class MainClocking(QMainWindow):
     def update_open_tasks(self):
         config = get_config_manager()
         is_configured, _ = config.is_jira_configured()
-        
+
         if not is_configured:
             QMessageBox.warning(
                 self,
@@ -154,17 +163,37 @@ class MainClocking(QMainWindow):
                 "Please configure Jira API settings in Menu → Settings to use this feature."
             )
             return
-        
+
         try:
             issues = get_jira_open_issues()
-            if len(issues) != 0:
-                output = io.StringIO()
-                writer = csv.writer(output)
-                writer.writerow(TASK_HEADER)
-                for issue in issues:
-                    writer.writerow([issue["task"], issue["description"]])
-                with open(OPEN_TASK_CSV, 'w') as f:
-                    f.write(output.getvalue())
+            if not issues:
+                self.restart_app()
+                return
+
+            new_task_ids = {issue["task"] for issue in issues}
+
+            try:
+                existing_df = pd.read_csv(TASKS_CSV, names=TASK_HEADER, header=0)
+            except FileNotFoundError:
+                existing_df = pd.DataFrame(columns=TASK_HEADER)
+
+            # Mark previously-open tasks that are no longer returned as closed
+            mask_open = existing_df["Task Type"] == "open"
+            mask_stale = ~existing_df["Task"].isin(new_task_ids)
+            existing_df.loc[mask_open & mask_stale, "Task Type"] = "closed"
+
+            # Upsert new Jira issues
+            for issue in issues:
+                task_id = issue["task"]
+                description = issue["description"]
+                if task_id in existing_df["Task"].values:
+                    existing_df.loc[existing_df["Task"] == task_id, "Description"] = description
+                    existing_df.loc[existing_df["Task"] == task_id, "Task Type"] = "open"
+                else:
+                    new_row = pd.DataFrame([[task_id, description, "open"]], columns=TASK_HEADER)
+                    existing_df = pd.concat([existing_df, new_row], ignore_index=True)
+
+            existing_df.to_csv(TASKS_CSV, index=False)
             self.restart_app()
         except Exception as e:
             QMessageBox.critical(
@@ -172,6 +201,11 @@ class MainClocking(QMainWindow):
                 "Failed to Update Tasks",
                 f"Error updating open tasks from Jira: {str(e)}"
             )
+
+    def open_task_manager(self):
+        dialog = TaskManagerDialog(self)
+        if dialog.exec() == TaskManagerDialog.DialogCode.Accepted:
+            self.restart_app()
 
     def open_check_clocking(self):
         self.check_clocking_window = ClockingSummary(self.clocking_window.dataframe)
@@ -404,11 +438,13 @@ class Clocking(QWidget):
 
     def create_task_buttons(self):
         self.task_buttons = {}
-        self.create_buttons_from_csv(OPEN_TASK_CSV)
-        self.create_buttons_from_csv(FIXED_TASK_CSV)
+        self.create_buttons_from_csv(TASKS_CSV)
 
     def create_buttons_from_csv(self, task_csv: str):
-        task_df = pd.read_csv(task_csv, names=TASK_HEADER, header=0)
+        try:
+            task_df = pd.read_csv(task_csv, names=TASK_HEADER, header=0)
+        except FileNotFoundError:
+            return
         for _, task in task_df.iterrows():
             task_id = task['Task']
             btn_check_in = QPushButton(task_id)
