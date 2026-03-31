@@ -199,7 +199,7 @@ class TestGetTodayWorkedHours:
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
         result = widget.get_today_worked_hours()
-        assert result >= datetime.timedelta(hours=1, minutes=30)
+        assert result == datetime.timedelta(hours=1, minutes=30)
         widget.close()
 
     def test_sums_multiple_completed_entries(self, clocking_env, qt_app):
