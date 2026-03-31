@@ -13,12 +13,12 @@ DB_FILE = 'clocking.db'
 
 @dataclass
 class ClockingRecord:
-    id: Optional[int] = None
     date: str                   # YYYY-MM-DD
     task: str
     check_in: str               # YYYY-MM-DD HH:MM  (full datetime)
     check_out: Optional[str]    # YYYY-MM-DD HH:MM or None
     message: Optional[str]
+    id: Optional[int] = None
 
     @property
     def check_in_time(self) -> str:

@@ -346,7 +346,7 @@ class Clocking(QWidget):
                 check_out_time = r.check_out_time
                 if not validate_time_format(check_out_time or ""):
                     errors.append(f"Row {i}: Invalid check-out time '{check_out_time}'. Expected HH:MM.")
-                elif r.check_in and r.check_out <= r.check_in:
+                elif r.check_in and r.check_out < r.check_in:
                     errors.append(f"Row {i}: Check-out must be after check-in.")
 
             if not validate_message_format(r.message or ""):
