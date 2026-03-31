@@ -94,6 +94,7 @@ def _task_duration_from_row(row: sqlite3.Row) -> TaskDuration:
 def init_db() -> None:
     """Create tables if they do not yet exist."""
     with _get_connection() as conn:
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS clockings (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
