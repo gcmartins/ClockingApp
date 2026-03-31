@@ -13,7 +13,7 @@ DB_FILE = 'clocking.db'
 
 @dataclass
 class ClockingRecord:
-    id: int
+    id: Optional[int] = None
     date: str                   # YYYY-MM-DD
     task: str
     check_in: str               # YYYY-MM-DD HH:MM  (full datetime)
