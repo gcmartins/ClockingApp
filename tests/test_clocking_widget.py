@@ -210,7 +210,7 @@ class TestGetTodayWorkedHours:
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
         result = widget.get_today_worked_hours()
-        assert result >= datetime.timedelta(hours=2)
+        assert result == datetime.timedelta(hours=2)
         widget.close()
 
     def test_excludes_entries_from_other_days(self, clocking_env, qt_app):
