@@ -39,7 +39,7 @@ def _migrate_to_sqlite():
                     task_rows.append(TaskRecord(
                         task=row[0].strip(),
                         description=row[1].strip(),
-                        task_type=row[2].strip() if row[2].strip() in ('fixed', 'open', 'closed') else 'fixed',
+                        task_type=row[2].strip() if row[2].strip() in TASK_TYPES else 'fixed',
                     ))
     else:
         for path, task_type in ((FIXED_TASK_CSV, 'fixed'), (OPEN_TASK_CSV, 'open')):
