@@ -19,7 +19,8 @@ from services.database import (
     ClockingRecord, TaskRecord,
     get_all_clockings, get_all_tasks,
     get_open_clocking, get_today_completed_seconds,
-    insert_clocking, update_check_out, save_clockings,
+    insert_clocking, update_check_out,
+    upsert_clocking, delete_clocking, save_clockings,
     mark_stale_open_tasks_closed, upsert_tasks,
 )
 from services.jira_api import get_jira_open_issues
@@ -295,66 +296,88 @@ class Clocking(QWidget):
 
         self.btn_stop.clicked.connect(self.record_check_out)
 
+    def _collect_row(self, row_idx: int) -> ClockingRecord:
+        """Build a ClockingRecord from a single table row."""
+        def cell(col):
+            item = self.csv_table.item(row_idx, col)
+            return item.text().strip() if item else ""
+
+        date = cell(0)
+        task = cell(1)
+        check_in_time = cell(2)   # HH:MM
+        check_out_time = cell(3)  # HH:MM or ""
+        message = cell(4) or None
+
+        check_in = f"{date} {check_in_time}" if date and check_in_time else ""
+        check_out = f"{date} {check_out_time}" if date and check_out_time else None
+
+        item_date = self.csv_table.item(row_idx, 0)
+        existing_id = item_date.data(Qt.ItemDataRole.UserRole) if item_date else None
+
+        return ClockingRecord(
+            date=date,
+            task=task,
+            check_in=check_in,
+            check_out=check_out,
+            message=message,
+            id=existing_id,
+        )
+
     def _collect_rows(self) -> list[ClockingRecord]:
-        """Build a list of ClockingRecord from the current table contents."""
-        records = []
-        for row_idx in range(self.csv_table.rowCount()):
-            def cell(col, ri=row_idx):
-                item = self.csv_table.item(ri, col)
-                return item.text().strip() if item else ""
+        """Build a list of ClockingRecord from all table rows."""
+        return [self._collect_row(i) for i in range(self.csv_table.rowCount())]
 
-            date = cell(0)
-            task = cell(1)
-            check_in_time = cell(2)   # HH:MM
-            check_out_time = cell(3)  # HH:MM or ""
-            message = cell(4) or None
-
-            check_in = f"{date} {check_in_time}" if date and check_in_time else ""
-            check_out = f"{date} {check_out_time}" if date and check_out_time else None
-
-            # Preserve the original DB id when the row came from existing data
-            item_date = self.csv_table.item(row_idx, 0)
-            existing_id = item_date.data(Qt.ItemDataRole.UserRole) if item_date else None
-
-            records.append(ClockingRecord(
-                id=existing_id,
-                date=date,
-                task=task,
-                check_in=check_in,
-                check_out=check_out,
-                message=message,
-            ))
-        return records
-
-    def _auto_save(self):
-        records = self._collect_rows()
+    def _validate_record(self, r: ClockingRecord, row_num: int) -> list[str]:
+        """Return a list of validation error strings for the given record."""
         errors = []
-        for i, r in enumerate(records, 1):
-            if not r.date:
-                errors.append(f"Row {i}: Date is empty.")
-            elif not validate_date_format(r.date):
-                errors.append(f"Row {i}: Invalid date '{r.date}'. Expected YYYY-MM-DD.")
+        if not r.date:
+            errors.append(f"Row {row_num}: Date is empty.")
+        elif not validate_date_format(r.date):
+            errors.append(f"Row {row_num}: Invalid date '{r.date}'. Expected YYYY-MM-DD.")
 
-            if not r.check_in:
-                errors.append(f"Row {i}: Check-in time is missing.")
-            else:
-                check_in_time = r.check_in_time
-                if not validate_time_format(check_in_time):
-                    errors.append(f"Row {i}: Invalid check-in time '{check_in_time}'. Expected HH:MM.")
+        if not r.check_in:
+            errors.append(f"Row {row_num}: Check-in time is missing.")
+        else:
+            if not validate_time_format(r.check_in_time):
+                errors.append(f"Row {row_num}: Invalid check-in time '{r.check_in_time}'. Expected HH:MM.")
 
-            if r.check_out:
-                check_out_time = r.check_out_time
-                if not validate_time_format(check_out_time or ""):
-                    errors.append(f"Row {i}: Invalid check-out time '{check_out_time}'. Expected HH:MM.")
-                elif r.check_in and r.check_out < r.check_in:
-                    errors.append(f"Row {i}: Check-out must be after check-in.")
+        if r.check_out:
+            check_out_time = r.check_out_time
+            if not validate_time_format(check_out_time or ""):
+                errors.append(f"Row {row_num}: Invalid check-out time '{check_out_time}'. Expected HH:MM.")
+            elif r.check_in and r.check_out < r.check_in:
+                errors.append(f"Row {row_num}: Check-out must be after check-in.")
 
-            if not validate_message_format(r.message or ""):
-                errors.append(f"Row {i}: Invalid message format.")
+        if not validate_message_format(r.message or ""):
+            errors.append(f"Row {row_num}: Invalid message format.")
 
-            if not r.task:
-                errors.append(f"Row {i}: Task is empty.")
+        if not r.task:
+            errors.append(f"Row {row_num}: Task is empty.")
 
+        return errors
+
+    def _revert_row(self, row_idx: int, record: ClockingRecord) -> None:
+        """Restore a table row to the given saved record's values."""
+        self.csv_table.blockSignals(True)
+        item_date = QTableWidgetItem(record.date)
+        item_date.setData(Qt.ItemDataRole.UserRole, record.id)
+        self.csv_table.setItem(row_idx, 0, item_date)
+        self.csv_table.setItem(row_idx, 1, QTableWidgetItem(record.task))
+        self.csv_table.setItem(row_idx, 2, QTableWidgetItem(record.check_in_time))
+        self.csv_table.setItem(row_idx, 3, QTableWidgetItem(record.check_out_time or ""))
+        self.csv_table.setItem(row_idx, 4, QTableWidgetItem(record.message or ""))
+        self.csv_table.blockSignals(False)
+
+    def _auto_save(self, item: QTableWidgetItem) -> None:
+        """Upsert the single row that changed instead of rewriting the whole table."""
+        row_idx = item.row()
+        record = self._collect_row(row_idx)
+
+        # New (unsaved) row: wait until the required fields are all present
+        if not record.id and not (record.date and record.task and record.check_in):
+            return
+
+        errors = self._validate_record(record, row_idx + 1)
         if errors:
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
@@ -363,16 +386,37 @@ class Clocking(QWidget):
             msg_box.setDetailedText("\n".join(errors))
             msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
             msg_box.exec()
-            self.update_table()
+            if row_idx < len(self.data):
+                self._revert_row(row_idx, self.data[row_idx])
             return
 
         try:
-            save_clockings(records)
+            saved_id = upsert_clocking(record)
         except Exception as e:
             self.show_db_error(f"Failed to save clocking data: {str(e)}")
+            if row_idx < len(self.data):
+                self._revert_row(row_idx, self.data[row_idx])
             return
 
-        self.load_data()
+        saved = ClockingRecord(
+            date=record.date,
+            task=record.task,
+            check_in=record.check_in,
+            check_out=record.check_out,
+            message=record.message,
+            id=saved_id,
+        )
+        # Store the assigned id into the cell so subsequent edits can find it
+        self.csv_table.blockSignals(True)
+        item_date = self.csv_table.item(row_idx, 0)
+        if item_date:
+            item_date.setData(Qt.ItemDataRole.UserRole, saved_id)
+        self.csv_table.blockSignals(False)
+
+        if row_idx < len(self.data):
+            self.data[row_idx] = saved
+        else:
+            self.data.append(saved)
         self.update_buttons()
 
     def update_table(self):
@@ -423,9 +467,19 @@ class Clocking(QWidget):
             return
         self.csv_table.blockSignals(True)
         for row_idx in selected_rows:
+            record_id = self.data[row_idx].id if row_idx < len(self.data) else None
+            if record_id:
+                try:
+                    delete_clocking(record_id)
+                except Exception as e:
+                    self.csv_table.blockSignals(False)
+                    self.show_db_error(f"Failed to delete row: {str(e)}")
+                    return
+            if row_idx < len(self.data):
+                self.data.pop(row_idx)
             self.csv_table.removeRow(row_idx)
         self.csv_table.blockSignals(False)
-        self._auto_save()
+        self.update_buttons()
 
     def create_task_buttons(self):
         self.task_buttons = {}

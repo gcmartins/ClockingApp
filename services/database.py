@@ -196,6 +196,29 @@ def update_check_out(row_id: int, check_out: str) -> None:
         )
 
 
+def upsert_clocking(record: ClockingRecord) -> int:
+    """Insert or update a single clocking row. Returns the row id."""
+    with _get_connection() as conn:
+        if record.id:
+            conn.execute(
+                "UPDATE clockings SET date=?, task=?, check_in=?, check_out=?, message=? WHERE id=?",
+                (record.date, record.task, record.check_in, record.check_out, record.message, record.id),
+            )
+            return record.id
+        else:
+            cursor = conn.execute(
+                "INSERT INTO clockings (date, task, check_in, check_out, message) VALUES (?, ?, ?, ?, ?)",
+                (record.date, record.task, record.check_in, record.check_out, record.message),
+            )
+            return cursor.lastrowid
+
+
+def delete_clocking(row_id: int) -> None:
+    """Delete a single clocking row by id."""
+    with _get_connection() as conn:
+        conn.execute("DELETE FROM clockings WHERE id = ?", (row_id,))
+
+
 def save_clockings(records: list[ClockingRecord]) -> None:
     """Replace the entire clockings table with the supplied records."""
     with _get_connection() as conn:
