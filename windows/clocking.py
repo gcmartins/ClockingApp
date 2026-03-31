@@ -382,7 +382,9 @@ class Clocking(QWidget):
         for r in self.data:
             row_idx = self.csv_table.rowCount()
             self.csv_table.insertRow(row_idx)
-            self.csv_table.setItem(row_idx, 0, QTableWidgetItem(r.date))
+            item_date = QTableWidgetItem(r.date)
+            item_date.setData(Qt.ItemDataRole.UserRole, r.id)
+            self.csv_table.setItem(row_idx, 0, item_date)
             self.csv_table.setItem(row_idx, 1, QTableWidgetItem(r.task))
             self.csv_table.setItem(row_idx, 2, QTableWidgetItem(r.check_in_time))
             self.csv_table.setItem(row_idx, 3, QTableWidgetItem(r.check_out_time or ""))
