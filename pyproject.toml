@@ -13,4 +13,16 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=7.4.0",
+    "pytest-cov>=4.0.0",
 ]
+
+[tool.pytest.ini_options]
+addopts = "--cov=services --cov=models --cov-report=term-missing --cov-report=html:htmlcov"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["services", "models"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+show_missing = true
