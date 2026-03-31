@@ -313,7 +313,8 @@ class Clocking(QWidget):
             check_out = f"{date} {check_out_time}" if date and check_out_time else None
 
             # Preserve the original DB id when the row came from existing data
-            existing_id = self.data[row_idx].id if row_idx < len(self.data) else 0
+            item_date = self.csv_table.item(row_idx, 0)
+            existing_id = item_date.data(Qt.ItemDataRole.UserRole) if item_date else None
 
             records.append(ClockingRecord(
                 id=existing_id,
