@@ -21,7 +21,7 @@ from services.database import (
     get_open_clocking, get_today_completed_seconds,
     insert_clocking, update_check_out,
     upsert_clocking, delete_clocking,
-    mark_stale_open_tasks_closed, upsert_tasks,
+    mark_stale_open_tasks_closed, upsert_tasks, get_tasks_by_type
 )
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
@@ -487,7 +487,8 @@ class Clocking(QWidget):
 
     def create_buttons_from_db(self):
         try:
-            tasks = get_all_tasks()
+            tasks = get_tasks_by_type('open')
+            tasks.extend(get_tasks_by_type('fixed'))
         except Exception as e:
             logging.error(f"Error loading tasks from DB: {e}")
             return

@@ -245,6 +245,18 @@ def get_all_tasks() -> list[TaskRecord]:
     return [_task_from_row(r) for r in rows]
 
 
+def get_tasks_by_type(task_type: str) -> list[TaskRecord]:
+    """Return all task rows ordered by task key."""
+    with _get_connection() as conn:
+        rows = conn.execute(
+            "SELECT task, description, task_type FROM tasks " 
+            "WHERE task_type = ? "
+            "ORDER BY task",
+            (task_type,),
+        ).fetchall()
+    return [_task_from_row(r) for r in rows]
+
+
 def get_task_descriptions() -> dict[str, str]:
     """Return a {task: description} mapping for all tasks."""
     with _get_connection() as conn:
