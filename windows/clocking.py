@@ -20,7 +20,7 @@ from services.database import (
     get_all_clockings, get_all_tasks,
     get_open_clocking, get_today_completed_seconds,
     insert_clocking, update_check_out,
-    upsert_clocking, delete_clocking, save_clockings,
+    upsert_clocking, delete_clocking,
     mark_stale_open_tasks_closed, upsert_tasks,
 )
 from services.jira_api import get_jira_open_issues

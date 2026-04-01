@@ -222,7 +222,6 @@ def delete_clocking(row_id: int) -> None:
 def save_clockings(records: list[ClockingRecord]) -> None:
     """Replace the entire clockings table with the supplied records."""
     with _get_connection() as conn:
-        conn.execute("DELETE FROM clockings")
         conn.executemany(
             "INSERT INTO clockings (id, date, task, check_in, check_out, message) "
             "VALUES (?, ?, ?, ?, ?, ?)",
