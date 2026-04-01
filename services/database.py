@@ -267,7 +267,6 @@ def get_task_descriptions() -> dict[str, str]:
 def save_tasks(records: list[TaskRecord]) -> None:
     """Replace the entire tasks table with the supplied records."""
     with _get_connection() as conn:
-        conn.execute("DELETE FROM tasks")
         conn.executemany(
             "INSERT INTO tasks (task, description, task_type) VALUES (?, ?, ?)",
             [(r.task, r.description, r.task_type) for r in records],
