@@ -1,7 +1,7 @@
-"""Tests for field-level validation helpers (services/csv_validator.py)."""
+"""Tests for field-level validation helpers (services/clocking_validator.py)."""
 import pytest
 
-from services.csv_validator import (
+from services.clocking_validator import (
     validate_date_format,
     validate_time_format,
     validate_message_format,

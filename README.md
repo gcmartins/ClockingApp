@@ -3,9 +3,9 @@ Clocking App
 
 ## Introduction
 
-This is a small desktop application to help register clocking into a CSV file with the following features:
+This is a small desktop application to help register clocking into a SQLite file with the following features:
 - Start, switch and stop clocking by click on Task buttons
-- Update the CSV file synchronized with the timer and the button states 
+- Update the SQLite file synchronized with the timer and the button states 
 - Push the clockings to Jira worklog 
 - Pull the actual assigned Jira issues to be clocked in the application
 - Notification when the workday timer reaches 8h of work.
@@ -29,7 +29,7 @@ The `setup.sh` script will install the environment and create a launcher file (`
 
 ## Configuration
 
-The application works without any API configuration for basic time tracking to CSV files.
+The application works without any API configuration for basic time tracking.
 
 ### Optional API Integration
 To enable additional features like Jira worklog and Clockify integration, you can optionally configure one or both services:

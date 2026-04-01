@@ -1,7 +1,7 @@
 [project]
 name = "clocking-app"
 version = "0.1.0"
-description = "A desktop application to register clockings into a CSV file"
+description = "A desktop application to register clockings into a SQLite file database"
 requires-python = ">=3.10"
 dependencies = [
     "PySide6>=6.6.0",

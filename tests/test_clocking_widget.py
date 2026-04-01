@@ -129,17 +129,17 @@ class TestAddRow:
     def test_add_row_increments_row_count(self, clocking_env):
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        initial = widget.csv_table.rowCount()
+        initial = widget.clocking_table.rowCount()
         widget.add_row()
-        assert widget.csv_table.rowCount() == initial + 1
+        assert widget.clocking_table.rowCount() == initial + 1
         widget.close()
 
     def test_add_row_sets_today_date_in_first_cell(self, clocking_env):
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
         widget.add_row()
-        last_row = widget.csv_table.rowCount() - 1
-        date_cell = widget.csv_table.item(last_row, 0)
+        last_row = widget.clocking_table.rowCount() - 1
+        date_cell = widget.clocking_table.item(last_row, 0)
         assert date_cell is not None
         assert date_cell.text() == TODAY
         widget.close()
@@ -148,9 +148,9 @@ class TestAddRow:
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
         widget.add_row()
-        last_row = widget.csv_table.rowCount() - 1
+        last_row = widget.clocking_table.rowCount() - 1
         for col in range(1, len(CLOCKING_HEADER)):
-            item = widget.csv_table.item(last_row, col)
+            item = widget.clocking_table.item(last_row, col)
             assert item is not None
             assert item.text() == ''
         widget.close()
@@ -158,11 +158,11 @@ class TestAddRow:
     def test_multiple_add_rows(self, clocking_env):
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        initial = widget.csv_table.rowCount()
+        initial = widget.clocking_table.rowCount()
         widget.add_row()
         widget.add_row()
         widget.add_row()
-        assert widget.csv_table.rowCount() == initial + 3
+        assert widget.clocking_table.rowCount() == initial + 3
         widget.close()
 
 

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 
 from services.constants import CLOCKING_HEADER, TASK_TYPES
-from services.csv_validator import (
+from services.clocking_validator import (
     validate_date_format, validate_time_format, validate_message_format,
 )
 from services.database import (
@@ -262,23 +262,23 @@ class Clocking(QWidget):
         task_ids = get_all_task_ids()
         self._task_delegate = TaskComboDelegate(task_ids, self)
 
-        self.csv_table = QTableWidget()
-        self.csv_table.setColumnCount(len(CLOCKING_HEADER))
-        self.csv_table.setHorizontalHeaderLabels(CLOCKING_HEADER)
-        self.csv_table.setItemDelegateForColumn(1, self._task_delegate)
-        header = self.csv_table.horizontalHeader()
+        self.clocking_table = QTableWidget()
+        self.clocking_table.setColumnCount(len(CLOCKING_HEADER))
+        self.clocking_table.setHorizontalHeaderLabels(CLOCKING_HEADER)
+        self.clocking_table.setItemDelegateForColumn(1, self._task_delegate)
+        header = self.clocking_table.horizontalHeader()
         for col in range(len(CLOCKING_HEADER)):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         message_col = CLOCKING_HEADER.index("Message")
         header.setSectionResizeMode(message_col, QHeaderView.ResizeMode.Stretch)
-        self.csv_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.csv_table.setEditTriggers(
+        self.clocking_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.clocking_table.setEditTriggers(
             QAbstractItemView.EditTrigger.DoubleClicked |
             QAbstractItemView.EditTrigger.SelectedClicked |
             QAbstractItemView.EditTrigger.EditKeyPressed
         )
         self.update_table()
-        self.csv_table.itemChanged.connect(self._auto_save)
+        self.clocking_table.itemChanged.connect(self._auto_save)
 
         self.add_row_btn = QPushButton("Add Row")
         self.add_row_btn.clicked.connect(self.add_row)
@@ -289,7 +289,7 @@ class Clocking(QWidget):
         btn_hbox.addWidget(self.add_row_btn)
         btn_hbox.addWidget(self.delete_row_btn)
 
-        vbox.addWidget(self.csv_table)
+        vbox.addWidget(self.clocking_table)
         vbox.addLayout(btn_hbox)
 
         self.setLayout(vbox)
@@ -299,7 +299,7 @@ class Clocking(QWidget):
     def _collect_row(self, row_idx: int) -> ClockingRecord:
         """Build a ClockingRecord from a single table row."""
         def cell(col):
-            item = self.csv_table.item(row_idx, col)
+            item = self.clocking_table.item(row_idx, col)
             return item.text().strip() if item else ""
 
         date = cell(0)
@@ -311,7 +311,7 @@ class Clocking(QWidget):
         check_in = f"{date} {check_in_time}" if date and check_in_time else ""
         check_out = f"{date} {check_out_time}" if date and check_out_time else None
 
-        item_date = self.csv_table.item(row_idx, 0)
+        item_date = self.clocking_table.item(row_idx, 0)
         existing_id = item_date.data(Qt.ItemDataRole.UserRole) if item_date else None
 
         return ClockingRecord(
@@ -325,7 +325,7 @@ class Clocking(QWidget):
 
     def _collect_rows(self) -> list[ClockingRecord]:
         """Build a list of ClockingRecord from all table rows."""
-        return [self._collect_row(i) for i in range(self.csv_table.rowCount())]
+        return [self._collect_row(i) for i in range(self.clocking_table.rowCount())]
 
     def _validate_record(self, r: ClockingRecord, row_num: int) -> list[str]:
         """Return a list of validation error strings for the given record."""
@@ -358,15 +358,15 @@ class Clocking(QWidget):
 
     def _revert_row(self, row_idx: int, record: ClockingRecord) -> None:
         """Restore a table row to the given saved record's values."""
-        self.csv_table.blockSignals(True)
+        self.clocking_table.blockSignals(True)
         item_date = QTableWidgetItem(record.date)
         item_date.setData(Qt.ItemDataRole.UserRole, record.id)
-        self.csv_table.setItem(row_idx, 0, item_date)
-        self.csv_table.setItem(row_idx, 1, QTableWidgetItem(record.task))
-        self.csv_table.setItem(row_idx, 2, QTableWidgetItem(record.check_in_time))
-        self.csv_table.setItem(row_idx, 3, QTableWidgetItem(record.check_out_time or ""))
-        self.csv_table.setItem(row_idx, 4, QTableWidgetItem(record.message or ""))
-        self.csv_table.blockSignals(False)
+        self.clocking_table.setItem(row_idx, 0, item_date)
+        self.clocking_table.setItem(row_idx, 1, QTableWidgetItem(record.task))
+        self.clocking_table.setItem(row_idx, 2, QTableWidgetItem(record.check_in_time))
+        self.clocking_table.setItem(row_idx, 3, QTableWidgetItem(record.check_out_time or ""))
+        self.clocking_table.setItem(row_idx, 4, QTableWidgetItem(record.message or ""))
+        self.clocking_table.blockSignals(False)
 
     def _auto_save(self, item: QTableWidgetItem) -> None:
         """Upsert the single row that changed instead of rewriting the whole table."""
@@ -407,11 +407,11 @@ class Clocking(QWidget):
             id=saved_id,
         )
         # Store the assigned id into the cell so subsequent edits can find it
-        self.csv_table.blockSignals(True)
-        item_date = self.csv_table.item(row_idx, 0)
+        self.clocking_table.blockSignals(True)
+        item_date = self.clocking_table.item(row_idx, 0)
         if item_date:
             item_date.setData(Qt.ItemDataRole.UserRole, saved_id)
-        self.csv_table.blockSignals(False)
+        self.clocking_table.blockSignals(False)
 
         if row_idx < len(self.data):
             self.data[row_idx] = saved
@@ -421,36 +421,36 @@ class Clocking(QWidget):
 
     def update_table(self):
         """Repopulate the clocking table from self.data."""
-        self.csv_table.blockSignals(True)
-        self.csv_table.setRowCount(0)
+        self.clocking_table.blockSignals(True)
+        self.clocking_table.setRowCount(0)
         for r in self.data:
-            row_idx = self.csv_table.rowCount()
-            self.csv_table.insertRow(row_idx)
+            row_idx = self.clocking_table.rowCount()
+            self.clocking_table.insertRow(row_idx)
             item_date = QTableWidgetItem(r.date)
             item_date.setData(Qt.ItemDataRole.UserRole, r.id)
-            self.csv_table.setItem(row_idx, 0, item_date)
-            self.csv_table.setItem(row_idx, 1, QTableWidgetItem(r.task))
-            self.csv_table.setItem(row_idx, 2, QTableWidgetItem(r.check_in_time))
-            self.csv_table.setItem(row_idx, 3, QTableWidgetItem(r.check_out_time or ""))
-            self.csv_table.setItem(row_idx, 4, QTableWidgetItem(r.message or ""))
-        self.csv_table.blockSignals(False)
-        if self.csv_table.rowCount() > 0:
-            self.csv_table.scrollToBottom()
+            self.clocking_table.setItem(row_idx, 0, item_date)
+            self.clocking_table.setItem(row_idx, 1, QTableWidgetItem(r.task))
+            self.clocking_table.setItem(row_idx, 2, QTableWidgetItem(r.check_in_time))
+            self.clocking_table.setItem(row_idx, 3, QTableWidgetItem(r.check_out_time or ""))
+            self.clocking_table.setItem(row_idx, 4, QTableWidgetItem(r.message or ""))
+        self.clocking_table.blockSignals(False)
+        if self.clocking_table.rowCount() > 0:
+            self.clocking_table.scrollToBottom()
 
     def add_row(self):
-        row_idx = self.csv_table.rowCount()
-        self.csv_table.blockSignals(True)
-        self.csv_table.insertRow(row_idx)
-        self.csv_table.setItem(row_idx, 0, QTableWidgetItem(datetime.date.today().isoformat()))
+        row_idx = self.clocking_table.rowCount()
+        self.clocking_table.blockSignals(True)
+        self.clocking_table.insertRow(row_idx)
+        self.clocking_table.setItem(row_idx, 0, QTableWidgetItem(datetime.date.today().isoformat()))
         for col_idx in range(1, len(CLOCKING_HEADER)):
-            self.csv_table.setItem(row_idx, col_idx, QTableWidgetItem(""))
-        self.csv_table.blockSignals(False)
-        self.csv_table.scrollToBottom()
-        self.csv_table.setCurrentCell(row_idx, 1)
+            self.clocking_table.setItem(row_idx, col_idx, QTableWidgetItem(""))
+        self.clocking_table.blockSignals(False)
+        self.clocking_table.scrollToBottom()
+        self.clocking_table.setCurrentCell(row_idx, 1)
 
     def delete_row(self):
         selected_rows = sorted(
-            set(index.row() for index in self.csv_table.selectedIndexes()),
+            set(index.row() for index in self.clocking_table.selectedIndexes()),
             reverse=True,
         )
         if not selected_rows:
@@ -465,20 +465,20 @@ class Clocking(QWidget):
         )
         if confirm != QMessageBox.StandardButton.Yes:
             return
-        self.csv_table.blockSignals(True)
+        self.clocking_table.blockSignals(True)
         for row_idx in selected_rows:
             record_id = self.data[row_idx].id if row_idx < len(self.data) else None
             if record_id:
                 try:
                     delete_clocking(record_id)
                 except Exception as e:
-                    self.csv_table.blockSignals(False)
+                    self.clocking_table.blockSignals(False)
                     self.show_db_error(f"Failed to delete row: {str(e)}")
                     return
             if row_idx < len(self.data):
                 self.data.pop(row_idx)
-            self.csv_table.removeRow(row_idx)
-        self.csv_table.blockSignals(False)
+            self.clocking_table.removeRow(row_idx)
+        self.clocking_table.blockSignals(False)
         self.update_buttons()
 
     def create_task_buttons(self):
