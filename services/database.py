@@ -210,7 +210,7 @@ def upsert_clocking(record: ClockingRecord) -> int:
                 "INSERT INTO clockings (date, task, check_in, check_out, message) VALUES (?, ?, ?, ?, ?)",
                 (record.date, record.task, record.check_in, record.check_out, record.message),
             )
-            return cursor.lastrowid
+            return cursor.lastrowid if cursor.lastrowid is not None else 0
 
 
 def delete_clocking(row_id: int) -> None:
