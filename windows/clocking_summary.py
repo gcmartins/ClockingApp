@@ -1,22 +1,26 @@
-from typing import Optional
-
-import pandas as pd
 import datetime
 
 from PySide6 import QtGui
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from services.clockify_api import push_worklog_to_clockify
-from services.utils import format_timedelta, format_timedelta_jira
-from services.jira_api import push_worklog_to_jira
 from services.config_manager import get_config_manager
+from services.database import (
+    ClockingRecord,
+    get_clockings_for_date,
+    get_task_durations_for_date,
+)
+from services.jira_api import push_worklog_to_jira
+from services.utils import format_timedelta, format_timedelta_jira
+
+_FMT = "%Y-%m-%d %H:%M"
 
 
 class ClockingSummary(QWidget):
-    def __init__(self, dataframe):
+    def __init__(self, data: list[ClockingRecord]):
         super().__init__()
-        self._dataframe = dataframe
+        self._data = data
         self.setWindowTitle("Clocking Summary")
         self.setMinimumSize(200, 200)
 
@@ -24,7 +28,6 @@ class ClockingSummary(QWidget):
         week_tasks = self.compute_week_task_duration(today)
 
         main_layout = QVBoxLayout()
-
         hbox = QHBoxLayout()
 
         for task in week_tasks:
@@ -52,93 +55,96 @@ class ClockingSummary(QWidget):
         def do_push_clockings():
             self.push_to_jira(day)
             self.push_to_clockify(day)
-        
         return do_push_clockings
-
 
     def push_to_jira(self, day: str) -> None:
         config = get_config_manager()
-        is_configured, missing = config.is_jira_configured()
-        
-        if not is_configured:
-            self.log_text.append(f'<span style="color:red;">Jira is not configured. Please configure it in Menu → Settings.</span>')
-            return
-        
-        date = datetime.date.fromisoformat(day)
+        is_configured, _ = config.is_jira_configured()
 
-        df = self._dataframe
-        today_data = df[(df["Date"].dt.date == date) & (pd.isna(df['Check Out']) == False)]
+        if not is_configured:
+            self.log_text.append(
+                '<span style="color:red;">Jira is not configured. '
+                'Please configure it in Menu → Settings.</span>'
+            )
+            return
+
+        date = datetime.date.fromisoformat(day)
         self.log_text.append(f'Pushing {day} clocking to Jira worklog ...')
-        for _, data in today_data.iterrows():
-            task = data['Task']
-            start_datetime: datetime.datetime = data['Check In']
-            end_datetime: datetime.datetime = data['Check Out']
-            duration = end_datetime - start_datetime
-            start_datetime = datetime.datetime(date.year, date.month, date.day, start_datetime.hour, start_datetime.minute)
-            ok = push_worklog_to_jira(task, start_datetime, duration)
-            self.log_pushing_output(duration, ok, task)
-        self.log_text.append(f'Done')
+
+        for r in get_clockings_for_date(day):
+            assert r.check_out is not None
+            check_in_dt = datetime.datetime.strptime(r.check_in, _FMT)
+            check_out_dt = datetime.datetime.strptime(r.check_out, _FMT)
+            duration = check_out_dt - check_in_dt
+            start_dt = datetime.datetime(date.year, date.month, date.day,
+                                         check_in_dt.hour, check_in_dt.minute)
+            ok = push_worklog_to_jira(r.task, start_dt, duration)
+            self.log_pushing_output(duration, ok, r.task)
+
+        self.log_text.append('Done')
+
+    def push_to_clockify(self, day: str) -> None:
+        config = get_config_manager()
+        is_configured, _ = config.is_clockify_configured()
+
+        if not is_configured:
+            self.log_text.append(
+                '<span style="color:red;">Clockify is not configured. '
+                'Please configure it in Menu → Settings.</span>'
+            )
+            return
+
+        date = datetime.date.fromisoformat(day)
+        self.log_text.append(f'Pushing {day} clocking to Clockify worklog ...')
+
+        for r in get_clockings_for_date(day):
+            assert r.check_out is not None
+            check_in_dt = datetime.datetime.strptime(r.check_in, _FMT)
+            check_out_dt = datetime.datetime.strptime(r.check_out, _FMT)
+            duration = check_out_dt - check_in_dt
+            start_dt = datetime.datetime(date.year, date.month, date.day,
+                                         check_in_dt.hour, check_in_dt.minute)
+            end_dt = datetime.datetime(date.year, date.month, date.day,
+                                       check_out_dt.hour, check_out_dt.minute)
+            ok = push_worklog_to_clockify(r.task, start_dt, end_dt)
+            self.log_pushing_output(duration, ok, r.task)
+
+        self.log_text.append('Done')
 
     def log_pushing_output(self, duration, ok, task):
         log_info = f'Task: {task}, Duration: {format_timedelta_jira(duration)}'
         log_status = 'Success' if ok else 'Fail'
         log_color = 'blue' if ok else 'red'
-        text_logging = f'<span style=\"color:{log_color};\">{log_info} --> {log_status}</span>'
-        self.log_text.append(text_logging)
+        self.log_text.append(
+            f'<span style="color:{log_color};">{log_info} --> {log_status}</span>'
+        )
         QtGui.QGuiApplication.processEvents()
 
-    def push_to_clockify(self, day: str) -> None:
-        config = get_config_manager()
-        is_configured, missing = config.is_clockify_configured()
-        
-        if not is_configured:
-            self.log_text.append(f'<span style="color:red;">Clockify is not configured. Please configure it in Menu → Settings.</span>')
-            return
-        
-        date = datetime.date.fromisoformat(day)
-
-        df = self._dataframe
-        today_data = df[(df["Date"].dt.date == date) & (pd.isna(df['Check Out']) == False)]
-        self.log_text.append(f'Pushing {day} clocking to Clockify worklog ...')
-        for _, data in today_data.iterrows():
-            task = data['Task']
-            start_datetime: datetime.datetime = data['Check In']
-            end_datetime: datetime.datetime = data['Check Out']
-            duration = end_datetime - start_datetime
-            start_datetime = datetime.datetime(date.year, date.month, date.day, start_datetime.hour, start_datetime.minute)
-            end_datetime = datetime.datetime(date.year, date.month, date.day, end_datetime.hour, end_datetime.minute)
-            ok = push_worklog_to_clockify(task, start_datetime, end_datetime)
-            self.log_pushing_output(duration, ok, task)
-        self.log_text.append(f'Done')
-
-    def compute_task_duration(self, day: datetime.date) -> Optional[dict]:
-        df = self._dataframe
-        today_data = df[(df["Date"].dt.date == day) & (pd.isna(df['Check Out']) == False)]
-        today_data["Duration"] = today_data["Check Out"] - today_data["Check In"]
-        task_duration = today_data.groupby('Task')['Duration'].sum()
-
-        if len(task_duration) == 0:
+    def compute_task_duration(self, day: datetime.date) -> dict | None:
+        durations = get_task_durations_for_date(day.isoformat())
+        if not durations:
             return None
 
-        task_day = {'date': '{}'.format(day)}
         task_string = ''
-        for task, duration in zip(task_duration.index, task_duration):
-            task_string += '{} -- {}<br>'.format(task, format_timedelta_jira(duration))
+        for td in durations:
+            delta = datetime.timedelta(seconds=td.total_seconds)
+            task_string += f'{td.task} -- {format_timedelta_jira(delta)}<br>'
 
-        task_day['clockings'] = task_string
+        total_seconds = sum(td.total_seconds for td in durations)
+        total_delta = datetime.timedelta(seconds=total_seconds)
 
-        task_day['total'] = 'Total -- {}<br>'.format(format_timedelta(task_duration.sum()))
-
-        return task_day
+        return {
+            'date': day.isoformat(),
+            'clockings': task_string,
+            'total': f'Total -- {format_timedelta(total_delta)}<br>',
+        }
 
     def compute_week_task_duration(self, date: datetime.date):
         current_date = date - datetime.timedelta(days=7)
-
         task_durations = []
         while current_date <= date:
             task_duration = self.compute_task_duration(current_date)
             if task_duration:
                 task_durations.append(task_duration)
             current_date += datetime.timedelta(days=1)
-
         return task_durations

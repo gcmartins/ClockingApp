@@ -1,10 +1,20 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                              QLineEdit, QPushButton, QGroupBox, QMessageBox,
-                              QFormLayout, QTabWidget, QWidget)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from services.clockify_api import clear_clockify_cache
 from services.config_manager import get_config_manager
 from services.jira_api import clear_jira_cache
-from services.clockify_api import clear_clockify_cache
 
 
 class SettingsDialog(QDialog):
@@ -102,7 +112,12 @@ class SettingsDialog(QDialog):
         self.jira_url_input = QLineEdit()
         self.jira_url_input.setPlaceholderText("https://yourcompany.atlassian.net")
         form_layout.addRow("Atlassian URL:", self.jira_url_input)
-        
+
+        # Task prefix
+        self.jira_task_prefix_input = QLineEdit()
+        self.jira_task_prefix_input.setPlaceholderText("e.g. PROJ, ABC (comma-separated)")
+        form_layout.addRow("Task Prefix:", self.jira_task_prefix_input)
+
         # Help text
         help_label = QLabel(
             '<small>To get your API token, visit: '
@@ -169,6 +184,7 @@ class SettingsDialog(QDialog):
         self.jira_email_input.setText(self.config_manager.get('ATLASSIAN_EMAIL'))
         self.jira_token_input.setText(self.config_manager.get('ATLASSIAN_TOKEN'))
         self.jira_url_input.setText(self.config_manager.get('ATLASSIAN_URL'))
+        self.jira_task_prefix_input.setText(self.config_manager.get('JIRA_TASK_PREFIX'))
         self.clockify_workspace_input.setText(self.config_manager.get('CLOCKIFY_WORKSPACE'))
         self.clockify_api_key_input.setText(self.config_manager.get('CLOCKIFY_API_KEY'))
     
@@ -179,6 +195,7 @@ class SettingsDialog(QDialog):
             'ATLASSIAN_EMAIL': self.jira_email_input.text().strip(),
             'ATLASSIAN_TOKEN': self.jira_token_input.text().strip(),
             'ATLASSIAN_URL': self.jira_url_input.text().strip(),
+            'JIRA_TASK_PREFIX': self.jira_task_prefix_input.text().strip(),
             'CLOCKIFY_WORKSPACE': self.clockify_workspace_input.text().strip(),
             'CLOCKIFY_API_KEY': self.clockify_api_key_input.text().strip(),
         }
@@ -227,6 +244,8 @@ class SettingsDialog(QDialog):
             "You can configure these now or later via Menu → Settings."
         )
         welcome_label.setWordWrap(True)
-        dialog.layout().insertWidget(0, welcome_label)
+        dialog_layout = dialog.layout()
+        assert isinstance(dialog_layout, QVBoxLayout)
+        dialog_layout.insertWidget(0, welcome_label)
         
         return dialog.exec() == QDialog.DialogCode.Accepted

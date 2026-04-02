@@ -1,10 +1,9 @@
 [project]
 name = "clocking-app"
 version = "0.1.0"
-description = "A desktop application to register clockings into a CSV file"
+description = "A desktop application to register clockings into a SQLite file database"
 requires-python = ">=3.10"
 dependencies = [
-    "pandas==2.2.0",
     "PySide6>=6.6.0",
     "python-dotenv~=1.0.1",
     "jira>=3.10.5",
@@ -14,4 +13,16 @@ dependencies = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.0.0",
+    "ruff>=0.15.8",
+    "ty>=0.0.27",
 ]
+
+[tool.ruff]
+line-length = 100
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ty.environment]
+python-version = "3.12"

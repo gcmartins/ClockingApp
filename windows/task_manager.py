@@ -1,14 +1,21 @@
-import csv
-import io
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QMessageBox,
-    QDialogButtonBox, QHeaderView, QAbstractItemView, QComboBox, QStyledItemDelegate,
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QHeaderView,
+    QMessageBox,
+    QPushButton,
+    QStyledItemDelegate,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
 
-from services.constants import TASKS_CSV, TASK_HEADER, TASK_TYPES
+from services.constants import TASK_HEADER, TASK_TYPES
+from services.database import TaskRecord, get_all_tasks, save_tasks
 
 
 class _TaskTypeDelegate(QStyledItemDelegate):
@@ -32,7 +39,7 @@ class _TaskTypeDelegate(QStyledItemDelegate):
 
 
 class TaskManagerDialog(QDialog):
-    """Dialog for creating, editing, and deleting tasks in tasks.csv."""
+    """Dialog for creating, editing, and deleting tasks."""
 
     _COL_TASK = 0
     _COL_DESC = 1
@@ -83,20 +90,11 @@ class TaskManagerDialog(QDialog):
         self.setLayout(layout)
 
     def _load_tasks(self):
-        try:
-            with open(TASKS_CSV, newline='') as f:
-                reader = csv.reader(f)
-                next(reader, None)  # skip header
-                rows = [r for r in reader if any(r)]
-        except FileNotFoundError:
-            rows = []
-
+        tasks = get_all_tasks()
         self._table.blockSignals(True)
         self._table.setRowCount(0)
-        for row_data in rows:
-            while len(row_data) < len(TASK_HEADER):
-                row_data.append('')
-            self._insert_row(row_data[0], row_data[1], row_data[2])
+        for t in tasks:
+            self._insert_row(t.task, t.description, t.task_type)
         self._table.blockSignals(False)
 
     def _insert_row(self, task: str = '', description: str = '', task_type: str = 'fixed'):
@@ -132,7 +130,7 @@ class TaskManagerDialog(QDialog):
         for row_idx in selected_rows:
             self._table.removeRow(row_idx)
 
-    def _collect_rows(self):
+    def _collect_rows(self) -> list[tuple]:
         rows = []
         for row_idx in range(self._table.rowCount()):
             task = (self._table.item(row_idx, self._COL_TASK) or QTableWidgetItem()).text().strip()
@@ -158,11 +156,9 @@ class TaskManagerDialog(QDialog):
             )
             return
 
-        output = io.StringIO()
-        writer = csv.writer(output, lineterminator="\n")
-        writer.writerow(TASK_HEADER)
-        writer.writerows(rows)
-        with open(TASKS_CSV, 'w') as f:
-            f.write(output.getvalue())
-
+        records = [
+            TaskRecord(task=task, description=desc, task_type=task_type)
+            for task, desc, task_type in rows
+        ]
+        save_tasks(records)
         self.accept()

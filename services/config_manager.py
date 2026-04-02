@@ -1,6 +1,6 @@
 import os
-from typing import Optional, Dict
-from dotenv import set_key, find_dotenv, dotenv_values
+
+from dotenv import dotenv_values, find_dotenv, set_key
 
 
 class ConfigManager:
@@ -10,8 +10,11 @@ class ConfigManager:
     REQUIRED_JIRA_KEYS = ['ATLASSIAN_EMAIL', 'ATLASSIAN_TOKEN', 'ATLASSIAN_URL']
     REQUIRED_CLOCKIFY_KEYS = ['CLOCKIFY_WORKSPACE', 'CLOCKIFY_API_KEY']
     ALL_REQUIRED_KEYS = REQUIRED_JIRA_KEYS + REQUIRED_CLOCKIFY_KEYS
+
+    # Optional configuration keys
+    OPTIONAL_KEYS = ['JIRA_TASK_PREFIX']
     
-    def __init__(self, env_path: Optional[str] = None):
+    def __init__(self, env_path: str | None = None):
         """
         Initialize config manager
         
@@ -19,21 +22,22 @@ class ConfigManager:
             env_path: Path to .env file. If None, will search for .env in current directory
         """
         self.env_path = env_path or find_dotenv() or '.env'
-        self._config = {}
+        self._config: dict[str, str] = {}
         self.load_config()
     
     def load_config(self) -> None:
         """Load configuration from .env file"""
         # Load values directly from .env file without modifying process environment
+        all_keys = self.ALL_REQUIRED_KEYS + self.OPTIONAL_KEYS
         if os.path.exists(self.env_path):
             env_values = dotenv_values(self.env_path)
             self._config = {
-                key: env_values.get(key, '') for key in self.ALL_REQUIRED_KEYS
+                key: env_values.get(key) or '' for key in all_keys
             }
         else:
             # If file doesn't exist, initialize with empty values
             self._config = {
-                key: '' for key in self.ALL_REQUIRED_KEYS
+                key: '' for key in all_keys
             }
     
     def get(self, key: str, default: str = '') -> str:
@@ -78,7 +82,7 @@ class ConfigManager:
             print(f"Error saving configuration: {e}")
             return False
     
-    def get_all(self) -> Dict[str, str]:
+    def get_all(self) -> dict[str, str]:
         """
         Get all configuration values
         
@@ -87,7 +91,7 @@ class ConfigManager:
         """
         return self._config.copy()
     
-    def update_all(self, config: Dict[str, str]) -> None:
+    def update_all(self, config: dict[str, str]) -> None:
         """
         Update multiple configuration values at once
         
@@ -129,7 +133,7 @@ class ConfigManager:
 
 
 # Global instance
-_config_manager: Optional[ConfigManager] = None
+_config_manager: ConfigManager | None = None
 
 
 def get_config_manager() -> ConfigManager:

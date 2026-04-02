@@ -1,6 +1,6 @@
 import os
 import tempfile
-import pytest
+
 from services.config_manager import ConfigManager
 
 
