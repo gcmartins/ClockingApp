@@ -10,6 +10,9 @@ class ConfigManager:
     REQUIRED_JIRA_KEYS = ['ATLASSIAN_EMAIL', 'ATLASSIAN_TOKEN', 'ATLASSIAN_URL']
     REQUIRED_CLOCKIFY_KEYS = ['CLOCKIFY_WORKSPACE', 'CLOCKIFY_API_KEY']
     ALL_REQUIRED_KEYS = REQUIRED_JIRA_KEYS + REQUIRED_CLOCKIFY_KEYS
+
+    # Optional configuration keys
+    OPTIONAL_KEYS = ['JIRA_TASK_PREFIX']
     
     def __init__(self, env_path: Optional[str] = None):
         """
@@ -25,15 +28,16 @@ class ConfigManager:
     def load_config(self) -> None:
         """Load configuration from .env file"""
         # Load values directly from .env file without modifying process environment
+        all_keys = self.ALL_REQUIRED_KEYS + self.OPTIONAL_KEYS
         if os.path.exists(self.env_path):
             env_values = dotenv_values(self.env_path)
             self._config = {
-                key: env_values.get(key, '') for key in self.ALL_REQUIRED_KEYS
+                key: env_values.get(key, '') for key in all_keys
             }
         else:
             # If file doesn't exist, initialize with empty values
             self._config = {
-                key: '' for key in self.ALL_REQUIRED_KEYS
+                key: '' for key in all_keys
             }
     
     def get(self, key: str, default: str = '') -> str:

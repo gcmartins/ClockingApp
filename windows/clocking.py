@@ -33,11 +33,15 @@ from windows.task_manager import TaskManagerDialog
 
 
 class TaskUI:
-    def __init__(self, id: str, description: str, button: QPushButton):
+    def __init__(self, id: str, description: str, button: QPushButton, link_url: Optional[str] = None):
         self.id = id
         self.description = description
         self.button = button
-        self.label = QLabel(self.description)
+        if link_url:
+            self.label = QLabel(f'<a href="{link_url}">{description}</a>')
+            self.label.setOpenExternalLinks(True)
+        else:
+            self.label = QLabel(description)
 
 
 def get_all_task_ids() -> list:
@@ -485,6 +489,20 @@ class Clocking(QWidget):
         self.task_buttons = {}
         self.create_buttons_from_db()
 
+    def _jira_link_for_task(self, task_id: str) -> Optional[str]:
+        config = get_config_manager()
+        prefix_str = config.get('JIRA_TASK_PREFIX', '')
+        if not prefix_str:
+            return None
+        base_url = config.get('ATLASSIAN_URL', '').rstrip('/')
+        if not base_url:
+            return None
+        prefixes = [p.strip() for p in prefix_str.split(',') if p.strip()]
+        for prefix in prefixes:
+            if task_id.upper().startswith(prefix.upper() + '-'):
+                return f"{base_url}/browse/{task_id}"
+        return None
+
     def create_buttons_from_db(self):
         try:
             tasks = get_tasks_by_type('open')
@@ -496,8 +514,9 @@ class Clocking(QWidget):
             btn_check_in = QPushButton(task_rec.task)
             btn_check_in.setFixedWidth(100)
             btn_check_in.clicked.connect(self.record_check_in(task_rec.task))
+            link_url = self._jira_link_for_task(task_rec.task)
             self.task_buttons[task_rec.task] = TaskUI(
-                task_rec.task, task_rec.description, btn_check_in
+                task_rec.task, task_rec.description, btn_check_in, link_url
             )
 
     def update_buttons(self):

@@ -102,7 +102,12 @@ class SettingsDialog(QDialog):
         self.jira_url_input = QLineEdit()
         self.jira_url_input.setPlaceholderText("https://yourcompany.atlassian.net")
         form_layout.addRow("Atlassian URL:", self.jira_url_input)
-        
+
+        # Task prefix
+        self.jira_task_prefix_input = QLineEdit()
+        self.jira_task_prefix_input.setPlaceholderText("e.g. PROJ, ABC (comma-separated)")
+        form_layout.addRow("Task Prefix:", self.jira_task_prefix_input)
+
         # Help text
         help_label = QLabel(
             '<small>To get your API token, visit: '
@@ -169,6 +174,7 @@ class SettingsDialog(QDialog):
         self.jira_email_input.setText(self.config_manager.get('ATLASSIAN_EMAIL'))
         self.jira_token_input.setText(self.config_manager.get('ATLASSIAN_TOKEN'))
         self.jira_url_input.setText(self.config_manager.get('ATLASSIAN_URL'))
+        self.jira_task_prefix_input.setText(self.config_manager.get('JIRA_TASK_PREFIX'))
         self.clockify_workspace_input.setText(self.config_manager.get('CLOCKIFY_WORKSPACE'))
         self.clockify_api_key_input.setText(self.config_manager.get('CLOCKIFY_API_KEY'))
     
@@ -179,6 +185,7 @@ class SettingsDialog(QDialog):
             'ATLASSIAN_EMAIL': self.jira_email_input.text().strip(),
             'ATLASSIAN_TOKEN': self.jira_token_input.text().strip(),
             'ATLASSIAN_URL': self.jira_url_input.text().strip(),
+            'JIRA_TASK_PREFIX': self.jira_task_prefix_input.text().strip(),
             'CLOCKIFY_WORKSPACE': self.clockify_workspace_input.text().strip(),
             'CLOCKIFY_API_KEY': self.clockify_api_key_input.text().strip(),
         }
