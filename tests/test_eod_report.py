@@ -56,6 +56,7 @@ class TestGetTaskMessages:
         ]
         widget = EodReport(data)
         result = widget.get_task_messages(datetime.date.today())
+        assert result is not None
         assert 'TASK-1' in result
         assert 'TASK-2' not in result
         widget.close()
@@ -67,12 +68,14 @@ class TestGetTaskMessages:
         ]
         widget = EodReport(data)
         result = widget.get_task_messages(datetime.date.today())
+        assert result is not None
         assert result['TASK-1'] == ['msg1', 'msg2']
         widget.close()
 
     def test_null_message_included_in_task_key_but_not_messages(self, qt_app, db_env):
         widget = EodReport([make_record(TODAY, 'TASK-1', message=None)])
         result = widget.get_task_messages(datetime.date.today())
+        assert result is not None
         assert 'TASK-1' in result
         assert result['TASK-1'] == []
         widget.close()
@@ -84,6 +87,7 @@ class TestGetTaskMessages:
         ]
         widget = EodReport(data)
         result = widget.get_task_messages(datetime.date.today())
+        assert result is not None
         assert set(result.keys()) == {'TASK-1', 'TASK-2'}
         widget.close()
 

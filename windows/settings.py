@@ -244,6 +244,8 @@ class SettingsDialog(QDialog):
             "You can configure these now or later via Menu → Settings."
         )
         welcome_label.setWordWrap(True)
-        dialog.layout().insertWidget(0, welcome_label)
+        dialog_layout = dialog.layout()
+        assert isinstance(dialog_layout, QVBoxLayout)
+        dialog_layout.insertWidget(0, welcome_label)
         
         return dialog.exec() == QDialog.DialogCode.Accepted

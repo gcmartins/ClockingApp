@@ -239,7 +239,7 @@ class Clocking(QWidget):
     def __init__(self, tray_icon: QSystemTrayIcon):
         super().__init__()
         self.tray_icon = tray_icon
-        self.timer_clocking_label = None
+        self.timer_clocking_label: QLabel | None = None
         self.started_task_id: str | None = None
         self.data: list[ClockingRecord] = []
         self.load_data()
@@ -573,6 +573,7 @@ class Clocking(QWidget):
         end_date = now.date().isoformat()
         end_time = now.strftime("%H:%M")
 
+        assert open_rec.id is not None
         if started_date == end_date:
             update_check_out(open_rec.id, f"{end_date} {end_time}")
         else:
@@ -595,6 +596,7 @@ class Clocking(QWidget):
 
     def update_time(self):
         self.worked_hours = self.get_today_worked_hours()
+        assert self.timer_clocking_label is not None
         self.timer_clocking_label.setText(format_timedelta(self.worked_hours))
         self.warn_if_overtime()
 
@@ -616,6 +618,7 @@ class Clocking(QWidget):
 
     def warn_if_overtime(self) -> None:
         todays_hours = self.worked_hours
+        assert self.timer_clocking_label is not None
         if todays_hours >= datetime.timedelta(hours=8):
             self.timer_clocking_label.setStyleSheet("color: red")
             if not self._overtime_message_showed:

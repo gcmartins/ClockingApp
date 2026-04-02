@@ -22,7 +22,7 @@ class ConfigManager:
             env_path: Path to .env file. If None, will search for .env in current directory
         """
         self.env_path = env_path or find_dotenv() or '.env'
-        self._config = {}
+        self._config: dict[str, str] = {}
         self.load_config()
     
     def load_config(self) -> None:
@@ -32,7 +32,7 @@ class ConfigManager:
         if os.path.exists(self.env_path):
             env_values = dotenv_values(self.env_path)
             self._config = {
-                key: env_values.get(key, '') for key in all_keys
+                key: env_values.get(key) or '' for key in all_keys
             }
         else:
             # If file doesn't exist, initialize with empty values

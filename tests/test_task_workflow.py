@@ -105,8 +105,11 @@ class TestTaskManagerDialogLoad:
         ])
         d = TaskManagerDialog()
         assert d._table.rowCount() == 2
-        assert d._table.item(0, TaskManagerDialog._COL_TASK).text() == 'TASK-1'
-        assert d._table.item(1, TaskManagerDialog._COL_TASK).text() == 'TASK-2'
+        item0 = d._table.item(0, TaskManagerDialog._COL_TASK)
+        item1 = d._table.item(1, TaskManagerDialog._COL_TASK)
+        assert item0 is not None and item1 is not None
+        assert item0.text() == 'TASK-1'
+        assert item1.text() == 'TASK-2'
         d.destroy()
 
     def test_invalid_task_type_defaults_to_fixed(self, qt_app, db_env):
@@ -114,8 +117,9 @@ class TestTaskManagerDialogLoad:
         # by using a raw connection; in practice we just test _insert_row fallback.
         d = TaskManagerDialog()
         d._insert_row('TASK-X', 'Some task', 'unknown_type')
-        type_text = d._table.item(d._table.rowCount() - 1, TaskManagerDialog._COL_TYPE).text()
-        assert type_text == 'fixed'
+        type_item = d._table.item(d._table.rowCount() - 1, TaskManagerDialog._COL_TYPE)
+        assert type_item is not None
+        assert type_item.text() == 'fixed'
         d.destroy()
 
 

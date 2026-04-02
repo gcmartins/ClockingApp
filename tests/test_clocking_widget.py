@@ -228,6 +228,7 @@ class TestWarnIfOvertime:
         widget.worked_hours = datetime.timedelta(hours=8)
         widget._overtime_message_showed = True
         widget.warn_if_overtime()
+        assert widget.timer_clocking_label is not None
         assert 'red' in widget.timer_clocking_label.styleSheet()
         widget.close()
 
@@ -237,6 +238,7 @@ class TestWarnIfOvertime:
         widget.worked_hours = datetime.timedelta(hours=9)
         widget._overtime_message_showed = True
         widget.warn_if_overtime()
+        assert widget.timer_clocking_label is not None
         assert 'red' in widget.timer_clocking_label.styleSheet()
         widget.close()
 
@@ -245,6 +247,7 @@ class TestWarnIfOvertime:
         widget = Clocking(make_tray_icon())
         widget.worked_hours = datetime.timedelta(hours=7, minutes=59)
         widget.warn_if_overtime()
+        assert widget.timer_clocking_label is not None
         assert 'green' in widget.timer_clocking_label.styleSheet()
         widget.close()
 

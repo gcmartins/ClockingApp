@@ -72,6 +72,7 @@ class ClockingSummary(QWidget):
         self.log_text.append(f'Pushing {day} clocking to Jira worklog ...')
 
         for r in get_clockings_for_date(day):
+            assert r.check_out is not None
             check_in_dt = datetime.datetime.strptime(r.check_in, _FMT)
             check_out_dt = datetime.datetime.strptime(r.check_out, _FMT)
             duration = check_out_dt - check_in_dt
@@ -97,6 +98,7 @@ class ClockingSummary(QWidget):
         self.log_text.append(f'Pushing {day} clocking to Clockify worklog ...')
 
         for r in get_clockings_for_date(day):
+            assert r.check_out is not None
             check_in_dt = datetime.datetime.strptime(r.check_in, _FMT)
             check_out_dt = datetime.datetime.strptime(r.check_out, _FMT)
             duration = check_out_dt - check_in_dt
