@@ -1,6 +1,6 @@
 import os
-from typing import Optional, Dict
-from dotenv import set_key, find_dotenv, dotenv_values
+
+from dotenv import dotenv_values, find_dotenv, set_key
 
 
 class ConfigManager:
@@ -14,7 +14,7 @@ class ConfigManager:
     # Optional configuration keys
     OPTIONAL_KEYS = ['JIRA_TASK_PREFIX']
     
-    def __init__(self, env_path: Optional[str] = None):
+    def __init__(self, env_path: str | None = None):
         """
         Initialize config manager
         
@@ -82,7 +82,7 @@ class ConfigManager:
             print(f"Error saving configuration: {e}")
             return False
     
-    def get_all(self) -> Dict[str, str]:
+    def get_all(self) -> dict[str, str]:
         """
         Get all configuration values
         
@@ -91,7 +91,7 @@ class ConfigManager:
         """
         return self._config.copy()
     
-    def update_all(self, config: Dict[str, str]) -> None:
+    def update_all(self, config: dict[str, str]) -> None:
         """
         Update multiple configuration values at once
         
@@ -133,7 +133,7 @@ class ConfigManager:
 
 
 # Global instance
-_config_manager: Optional[ConfigManager] = None
+_config_manager: ConfigManager | None = None
 
 
 def get_config_manager() -> ConfigManager:

@@ -1,13 +1,11 @@
 import datetime
-import os
 
 import pytest
 
-from services.constants import TASK_HEADER, TASK_TYPES
-from services.database import ClockingRecord, TaskRecord, init_db, get_all_tasks, get_all_clockings
+from services.constants import TASK_TYPES
+from services.database import TaskRecord, get_all_tasks, init_db
 from services.exceptions import ClockingException
 from services.utils import format_timedelta, format_timedelta_jira
-
 
 # ---------------------------------------------------------------------------
 # Fixture: isolated DB
@@ -82,8 +80,9 @@ class TestClockingException:
 # windows/task_manager.TaskManagerDialog
 # ---------------------------------------------------------------------------
 
+from PySide6.QtWidgets import QMessageBox  # noqa: E402
+
 from windows.task_manager import TaskManagerDialog  # noqa: E402
-from PySide6.QtWidgets import QTableWidgetItem, QMessageBox  # noqa: E402
 
 
 @pytest.fixture()

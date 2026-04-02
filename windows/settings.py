@@ -1,10 +1,20 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                              QLineEdit, QPushButton, QGroupBox, QMessageBox,
-                              QFormLayout, QTabWidget, QWidget)
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from services.clockify_api import clear_clockify_cache
 from services.config_manager import get_config_manager
 from services.jira_api import clear_jira_cache
-from services.clockify_api import clear_clockify_cache
 
 
 class SettingsDialog(QDialog):

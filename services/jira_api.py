@@ -1,10 +1,10 @@
 import datetime
 from functools import cache
-from typing import List
 
-from services.exceptions import ClockingException
-from services.config_manager import get_config_manager
 from jira import JIRA
+
+from services.config_manager import get_config_manager
+from services.exceptions import ClockingException
 
 OPEN_ISSUE_STATUS = ['Backlog', 'Review', 'In Progress', 'To Do', 'Triage', 'Blocked']
 
@@ -45,7 +45,7 @@ def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, dura
     return False
 
 
-def get_jira_open_issues() -> List[dict]:
+def get_jira_open_issues() -> list[dict]:
     config = get_config_manager()
     user_email = config.get('ATLASSIAN_EMAIL')
     issues = get_jira().search_issues(f'assignee="{user_email}"', fields=['status', 'summary'])

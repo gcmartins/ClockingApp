@@ -4,10 +4,8 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from windows.clocking import MainClocking
-
 from services.database import init_db
-
+from windows.clocking import MainClocking
 
 if __name__ == '__main__':
     init_db()

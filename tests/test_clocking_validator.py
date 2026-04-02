@@ -1,10 +1,9 @@
 """Tests for field-level validation helpers (services/clocking_validator.py)."""
-import pytest
 
 from services.clocking_validator import (
     validate_date_format,
-    validate_time_format,
     validate_message_format,
+    validate_time_format,
 )
 
 

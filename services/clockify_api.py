@@ -4,9 +4,9 @@ from zoneinfo import ZoneInfo
 
 import requests
 
+from services.config_manager import get_config_manager
 from services.exceptions import ClockingException
 from services.jira_api import get_project_name
-from services.config_manager import get_config_manager
 
 
 class ClockifyConfig:

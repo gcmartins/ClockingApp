@@ -1,8 +1,17 @@
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTableWidget, QTableWidgetItem, QMessageBox,
-    QDialogButtonBox, QHeaderView, QAbstractItemView, QComboBox, QStyledItemDelegate,
+    QAbstractItemView,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QHeaderView,
+    QMessageBox,
+    QPushButton,
+    QStyledItemDelegate,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
 
 from services.constants import TASK_HEADER, TASK_TYPES

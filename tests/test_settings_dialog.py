@@ -1,11 +1,9 @@
 """Tests for the SettingsDialog UI component (windows/settings.py)."""
 import pytest
-
-from PySide6.QtWidgets import QLineEdit, QPushButton, QMessageBox, QDialog
+from PySide6.QtWidgets import QLineEdit, QMessageBox, QPushButton
 
 from services.config_manager import ConfigManager
 from windows.settings import SettingsDialog
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

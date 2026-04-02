@@ -2,11 +2,8 @@
 import datetime
 from unittest.mock import MagicMock
 
-import pytest
-
 from services.database import ClockingRecord, TaskDuration
 from windows.clocking_summary import ClockingSummary
-
 
 # ---------------------------------------------------------------------------
 # Helpers

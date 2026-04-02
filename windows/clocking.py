@@ -1,31 +1,53 @@
 import datetime
 import logging
-from typing import Optional, Callable
+from collections.abc import Callable
 
-from PySide6.QtCore import QTimer, Qt
-from PySide6.QtGui import QIcon, QAction
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
-    QWidget, QMainWindow, QMenu, QSystemTrayIcon, QApplication, QLabel,
-    QPushButton, QVBoxLayout, QHBoxLayout, QSpacerItem, QSizePolicy,
-    QMessageBox, QTableWidget, QTableWidgetItem, QComboBox,
-    QAbstractItemView, QStyledItemDelegate, QHeaderView
+    QAbstractItemView,
+    QApplication,
+    QComboBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QSizePolicy,
+    QSpacerItem,
+    QStyledItemDelegate,
+    QSystemTrayIcon,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
-from services.constants import CLOCKING_HEADER, TASK_TYPES
 from services.clocking_validator import (
-    validate_date_format, validate_time_format, validate_message_format,
+    validate_date_format,
+    validate_message_format,
+    validate_time_format,
 )
+from services.config_manager import get_config_manager
+from services.constants import CLOCKING_HEADER
 from services.database import (
-    ClockingRecord, TaskRecord,
-    get_all_clockings, get_all_tasks,
-    get_open_clocking, get_today_completed_seconds,
-    insert_clocking, update_check_out,
-    upsert_clocking, delete_clocking,
-    mark_stale_open_tasks_closed, upsert_tasks, get_tasks_by_type
+    ClockingRecord,
+    delete_clocking,
+    get_all_clockings,
+    get_all_tasks,
+    get_open_clocking,
+    get_tasks_by_type,
+    get_today_completed_seconds,
+    insert_clocking,
+    mark_stale_open_tasks_closed,
+    update_check_out,
+    upsert_clocking,
+    upsert_tasks,
 )
 from services.jira_api import get_jira_open_issues
 from services.utils import format_timedelta
-from services.config_manager import get_config_manager
 from windows.clocking_summary import ClockingSummary
 from windows.eod_report import EodReport
 from windows.settings import SettingsDialog
@@ -33,7 +55,7 @@ from windows.task_manager import TaskManagerDialog
 
 
 class TaskUI:
-    def __init__(self, id: str, description: str, button: QPushButton, link_url: Optional[str] = None):
+    def __init__(self, id: str, description: str, button: QPushButton, link_url: str | None = None):
         self.id = id
         self.description = description
         self.button = button
@@ -218,7 +240,7 @@ class Clocking(QWidget):
         super().__init__()
         self.tray_icon = tray_icon
         self.timer_clocking_label = None
-        self.started_task_id: Optional[str] = None
+        self.started_task_id: str | None = None
         self.data: list[ClockingRecord] = []
         self.load_data()
         self._is_checked_out = True
@@ -489,7 +511,7 @@ class Clocking(QWidget):
         self.task_buttons = {}
         self.create_buttons_from_db()
 
-    def _jira_link_for_task(self, task_id: str) -> Optional[str]:
+    def _jira_link_for_task(self, task_id: str) -> str | None:
         config = get_config_manager()
         prefix_str = config.get('JIRA_TASK_PREFIX', '')
         if not prefix_str:
@@ -605,6 +627,6 @@ class Clocking(QWidget):
     def show_overtime_message(self, todays_hours):
         self.tray_icon.showMessage(
             'Work Overtime',
-            "You have worked {} today.".format(format_timedelta(todays_hours)),
+            f"You have worked {format_timedelta(todays_hours)} today.",
             QSystemTrayIcon.MessageIcon.Warning,
         )

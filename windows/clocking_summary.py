@@ -1,17 +1,18 @@
 import datetime
-from typing import Optional
 
 from PySide6 import QtGui
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QHBoxLayout, QTextEdit, QPushButton
+from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
 from services.clockify_api import push_worklog_to_clockify
-from services.utils import format_timedelta, format_timedelta_jira
-from services.jira_api import push_worklog_to_jira
 from services.config_manager import get_config_manager
 from services.database import (
-    ClockingRecord, get_clockings_for_date, get_task_durations_for_date,
+    ClockingRecord,
+    get_clockings_for_date,
+    get_task_durations_for_date,
 )
+from services.jira_api import push_worklog_to_jira
+from services.utils import format_timedelta, format_timedelta_jira
 
 _FMT = "%Y-%m-%d %H:%M"
 
@@ -117,7 +118,7 @@ class ClockingSummary(QWidget):
         )
         QtGui.QGuiApplication.processEvents()
 
-    def compute_task_duration(self, day: datetime.date) -> Optional[dict]:
+    def compute_task_duration(self, day: datetime.date) -> dict | None:
         durations = get_task_durations_for_date(day.isoformat())
         if not durations:
             return None

@@ -1,7 +1,6 @@
 import datetime
-from typing import Optional, Dict, List
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTextEdit
+from PySide6.QtWidgets import QTextEdit, QVBoxLayout, QWidget
 
 from services.database import ClockingRecord, get_task_descriptions
 
@@ -25,12 +24,12 @@ class EodReport(QWidget):
         if task_messages:
             self.display_task_messages(task_messages)
 
-    def get_task_messages(self, day: datetime.date) -> Optional[Dict[str, List[str]]]:
+    def get_task_messages(self, day: datetime.date) -> dict[str, list[str]] | None:
         today_data = [r for r in self._data if r.date == day.isoformat()]
         if not today_data:
             return None
 
-        task_messages: Dict[str, List[str]] = {}
+        task_messages: dict[str, list[str]] = {}
         for r in today_data:
             if r.task not in task_messages:
                 task_messages[r.task] = []
@@ -39,7 +38,7 @@ class EodReport(QWidget):
 
         return task_messages
 
-    def display_task_messages(self, task_messages: Dict[str, List[str]]):
+    def display_task_messages(self, task_messages: dict[str, list[str]]):
         descriptions = get_task_descriptions()
         report = ''
         for task, messages in task_messages.items():

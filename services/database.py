@@ -1,8 +1,6 @@
 """SQLite database access layer for ClockingApp."""
-import datetime
 import sqlite3
 from dataclasses import dataclass
-from typing import Optional
 
 DB_FILE = 'clocking.db'
 
@@ -16,9 +14,9 @@ class ClockingRecord:
     date: str                   # YYYY-MM-DD
     task: str
     check_in: str               # YYYY-MM-DD HH:MM  (full datetime)
-    check_out: Optional[str]    # YYYY-MM-DD HH:MM or None
-    message: Optional[str]
-    id: Optional[int] = None
+    check_out: str | None    # YYYY-MM-DD HH:MM or None
+    message: str | None
+    id: int | None = None
 
     @property
     def check_in_time(self) -> str:
@@ -26,7 +24,7 @@ class ClockingRecord:
         return self.check_in[11:] if self.check_in and len(self.check_in) >= 16 else self.check_in or ""
 
     @property
-    def check_out_time(self) -> Optional[str]:
+    def check_out_time(self) -> str | None:
         """Return the HH:MM portion of check_out (for UI display), or None."""
         if self.check_out and len(self.check_out) >= 16:
             return self.check_out[11:]
@@ -139,7 +137,7 @@ def get_clockings_for_date(date: str) -> list[ClockingRecord]:
     return [_clocking_from_row(r) for r in rows]
 
 
-def get_open_clocking() -> Optional[ClockingRecord]:
+def get_open_clocking() -> ClockingRecord | None:
     """Return the clocking row with no check_out (the active session), or None."""
     with _get_connection() as conn:
         row = conn.execute(
@@ -178,7 +176,7 @@ def get_task_durations_for_date(date: str) -> list[TaskDuration]:
     return [_task_duration_from_row(r) for r in rows]
 
 
-def insert_clocking(date: str, task: str, check_in: str, check_out: Optional[str] = None) -> None:
+def insert_clocking(date: str, task: str, check_in: str, check_out: str | None = None) -> None:
     """Insert a new clocking row."""
     with _get_connection() as conn:
         conn.execute(

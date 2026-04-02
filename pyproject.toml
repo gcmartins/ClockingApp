@@ -13,4 +13,16 @@ dependencies = [
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.0.0",
+    "ruff>=0.15.8",
+    "ty>=0.0.27",
 ]
+
+[tool.ruff]
+line-length = 100
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ty.environment]
+python-version = "3.12"

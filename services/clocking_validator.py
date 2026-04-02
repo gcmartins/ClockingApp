@@ -1,6 +1,5 @@
 """Field-level validation helpers for ClockingApp."""
 import datetime
-from typing import Tuple, Optional
 
 
 def validate_date_format(date_str: str) -> bool:

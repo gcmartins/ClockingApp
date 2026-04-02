@@ -6,7 +6,6 @@ import pytest
 from services.database import ClockingRecord, TaskRecord, init_db, save_tasks
 from windows.eod_report import EodReport
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

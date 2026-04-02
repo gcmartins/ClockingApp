@@ -3,12 +3,10 @@ import datetime
 from unittest.mock import MagicMock
 
 import pytest
-
 from PySide6.QtWidgets import QMessageBox
 
 from services.constants import CLOCKING_HEADER
 from services.database import ClockingRecord, TaskRecord, init_db, save_clockings, save_tasks
-
 
 # ---------------------------------------------------------------------------
 # Helpers
