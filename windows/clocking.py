@@ -180,14 +180,11 @@ class MainClocking(QMainWindow):
 
         try:
             issues = get_jira_open_issues()
-            if not issues:
-                self.restart_app()
-                return
-
             active_ids = {issue["task"] for issue in issues}
             mark_stale_open_tasks_closed(active_ids)
             upsert_tasks(issues)
             self.restart_app()
+            
         except Exception as e:
             QMessageBox.critical(
                 self,
