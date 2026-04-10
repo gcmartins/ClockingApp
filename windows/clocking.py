@@ -2,6 +2,8 @@ import datetime
 import logging
 from collections.abc import Callable
 
+import resources_rc  # noqa: F401
+
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
@@ -109,6 +111,7 @@ class MainClocking(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Clocking App")
+        self.setWindowIcon(QIcon(':/clock.png'))
 
         menubar = self.menuBar()
         menu = menubar.addMenu('Menu')
@@ -142,7 +145,7 @@ class MainClocking(QMainWindow):
         menu.addAction(close_action)
 
         self.tray_icon = QSystemTrayIcon(self)
-        self.tray_icon.setIcon(QIcon('clock.png'))
+        self.tray_icon.setIcon(QIcon(':/clock.png'))
         self.tray_icon.setToolTip('ClockingApp')
         self.tray_icon.activated.connect(self.tray_icon_activated)
 
