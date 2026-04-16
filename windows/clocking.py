@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSpacerItem,
     QStyledItemDelegate,
@@ -102,7 +103,14 @@ class TaskComboDelegate(QStyledItemDelegate):
         model.setData(index, editor.currentText(), Qt.ItemDataRole.EditRole)
 
     def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
+        rect = option.rect
+        if self._task_ids:
+            fm = editor.fontMetrics()
+            max_text_width = max(fm.horizontalAdvance(t) for t in self._task_ids)
+            min_width = max_text_width + 30  # extra space for the dropdown arrow
+            if rect.width() < min_width:
+                rect.setWidth(min_width)
+        editor.setGeometry(rect)
 
 
 class MainClocking(QMainWindow):
@@ -166,7 +174,7 @@ class MainClocking(QMainWindow):
         self.tray_icon.setContextMenu(self.tray_menu)
         self.tray_icon.show()
 
-        self.clocking_window = Clocking(self.tray_icon)
+        self.clocking_window = Clocking(self.tray_icon, manage_tasks_callback=self.open_task_manager)
         self.setCentralWidget(self.clocking_window)
 
     def update_open_tasks(self):
@@ -236,9 +244,10 @@ class MainClocking(QMainWindow):
 class Clocking(QWidget):
     EXIT_CODE_REBOOT = 122
 
-    def __init__(self, tray_icon: QSystemTrayIcon):
+    def __init__(self, tray_icon: QSystemTrayIcon, manage_tasks_callback: Callable | None = None):
         super().__init__()
         self.tray_icon = tray_icon
+        self._manage_tasks_callback = manage_tasks_callback
         self.timer_clocking_label: QLabel | None = None
         self.started_task_id: str | None = None
         self.data: list[ClockingRecord] = []
@@ -264,7 +273,7 @@ class Clocking(QWidget):
 
     def setup_ui(self):
         self.setWindowTitle("Clocking")
-        self.setMinimumSize(200, 200)
+        self.setMinimumSize(500, 200)
 
         self.timer_clocking_label = QLabel(format_timedelta(self.worked_hours))
         self.create_task_buttons()
@@ -277,12 +286,25 @@ class Clocking(QWidget):
         hbox.addWidget(QLabel("Timer:"))
         hbox.addWidget(self.timer_clocking_label)
         hbox.addSpacerItem(QSpacerItem(100, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        if self._manage_tasks_callback:
+            manage_tasks_btn = QPushButton("Manage Tasks")
+            manage_tasks_btn.clicked.connect(self._manage_tasks_callback)
+            hbox.addWidget(manage_tasks_btn)
         vbox.addLayout(hbox)
+        tasks_container = QWidget()
+        tasks_layout = QVBoxLayout(tasks_container)
+        tasks_layout.setContentsMargins(0, 0, 0, 0)
         for _, task in self.task_buttons.items():
             hbox = QHBoxLayout()
             hbox.addWidget(task.button)
             hbox.addWidget(task.label)
-            vbox.addLayout(hbox)
+            tasks_layout.addLayout(hbox)
+
+        tasks_scroll = QScrollArea()
+        tasks_scroll.setWidget(tasks_container)
+        tasks_scroll.setWidgetResizable(True)
+        tasks_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        vbox.addWidget(tasks_scroll)
         vbox.addWidget(self.btn_stop)
 
         task_ids = get_all_task_ids()
