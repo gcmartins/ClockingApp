@@ -1,6 +1,6 @@
 [project]
 name = "clocking-app"
-version = "0.1.1"
+version = "0.1.2"
 description = "A desktop application to register clockings into a SQLite file database"
 requires-python = ">=3.10"
 dependencies = [
