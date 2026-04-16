@@ -37,10 +37,10 @@ def make_tray_icon():
 
 @pytest.fixture
 def db_env(tmp_path, monkeypatch):
-    """Isolated SQLite DB in a temp directory; monkeypatches DB_FILE."""
+    """Isolated SQLite DB in a temp directory; monkeypatches get_db_path."""
     import services.database as db_module
     db_path = str(tmp_path / 'clocking.db')
-    monkeypatch.setattr(db_module, 'DB_FILE', db_path)
+    monkeypatch.setattr(db_module, 'get_db_path', lambda: db_path)
     init_db()
     monkeypatch.setattr(QMessageBox, "exec", lambda self: QMessageBox.StandardButton.Ok)
     monkeypatch.setattr(QMessageBox, "critical",

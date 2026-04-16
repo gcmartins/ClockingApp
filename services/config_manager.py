@@ -1,6 +1,8 @@
 import os
 
-from dotenv import dotenv_values, find_dotenv, set_key
+from dotenv import dotenv_values, set_key
+
+from services.database import get_app_data_dir
 
 
 class ConfigManager:
@@ -21,7 +23,7 @@ class ConfigManager:
         Args:
             env_path: Path to .env file. If None, will search for .env in current directory
         """
-        self.env_path = env_path or find_dotenv() or '.env'
+        self.env_path = env_path or str(get_app_data_dir() / '.env')
         self._config: dict[str, str] = {}
         self.load_config()
     

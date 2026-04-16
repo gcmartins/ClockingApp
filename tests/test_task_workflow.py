@@ -15,7 +15,7 @@ from services.utils import format_timedelta, format_timedelta_jira
 def db_env(tmp_path, monkeypatch):
     import services.database as db_module
     db_path = str(tmp_path / 'clocking.db')
-    monkeypatch.setattr(db_module, 'DB_FILE', db_path)
+    monkeypatch.setattr(db_module, 'get_db_path', lambda: db_path)
     init_db()
     monkeypatch.chdir(tmp_path)
     return tmp_path

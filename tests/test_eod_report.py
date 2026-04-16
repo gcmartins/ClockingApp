@@ -29,7 +29,7 @@ def make_record(date, task, check_in='09:00', check_out='10:00', message=None, i
 def db_env(tmp_path, monkeypatch):
     import services.database as db_module
     db_path = str(tmp_path / 'clocking.db')
-    monkeypatch.setattr(db_module, 'DB_FILE', db_path)
+    monkeypatch.setattr(db_module, 'get_db_path', lambda: db_path)
     init_db()
     return tmp_path
 

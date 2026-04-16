@@ -1,8 +1,9 @@
 """SQLite database access layer for ClockingApp."""
+import os
 import sqlite3
+import sys
 from dataclasses import dataclass
-
-DB_FILE = 'clocking.db'
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +49,21 @@ class TaskDuration:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+def get_app_data_dir() -> Path:
+    """Return a user-writable directory for all application data."""
+    if sys.platform == 'win32':
+        base = Path(os.environ.get('APPDATA', Path.home()))
+    elif sys.platform == 'darwin':
+        base = Path.home() / 'Library' / 'Application Support'
+    else:
+        base = Path(os.environ.get('XDG_DATA_HOME', Path.home() / '.local' / 'share'))
+    app_dir = base / 'ClockingApp'
+    app_dir.mkdir(parents=True, exist_ok=True)
+    return app_dir
+
+
 def get_db_path() -> str:
-    return DB_FILE
+    return str(get_app_data_dir() / 'clocking.db')
 
 
 def _get_connection() -> sqlite3.Connection:
