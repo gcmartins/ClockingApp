@@ -4,14 +4,16 @@ from PySide6 import QtGui
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QTextEdit, QVBoxLayout, QWidget
 
-from services.clockify_api import push_worklog_to_clockify
+from services.clockify_api import push_worklog_to_clockify, update_time_entry_in_clockify
 from services.config_manager import get_config_manager
 from services.database import (
     ClockingRecord,
     get_clockings_for_date,
     get_task_durations_for_date,
+    update_clockify_entry_id,
+    update_jira_worklog_id,
 )
-from services.jira_api import push_worklog_to_jira
+from services.jira_api import push_worklog_to_jira, update_worklog_in_jira
 from services.utils import format_timedelta, format_timedelta_jira
 
 _FMT = "%Y-%m-%d %H:%M"
@@ -78,7 +80,13 @@ class ClockingSummary(QWidget):
             duration = check_out_dt - check_in_dt
             start_dt = datetime.datetime(date.year, date.month, date.day,
                                          check_in_dt.hour, check_in_dt.minute)
-            ok = push_worklog_to_jira(r.task, start_dt, duration)
+            if r.jira_worklog_id:
+                ok = update_worklog_in_jira(r.task, r.jira_worklog_id, start_dt, duration)
+            else:
+                worklog_id = push_worklog_to_jira(r.task, start_dt, duration)
+                ok = worklog_id is not None
+                if ok and r.id is not None:
+                    update_jira_worklog_id(r.id, worklog_id)
             self.log_pushing_output(duration, ok, r.task)
 
         self.log_text.append('Done')
@@ -106,7 +114,13 @@ class ClockingSummary(QWidget):
                                          check_in_dt.hour, check_in_dt.minute)
             end_dt = datetime.datetime(date.year, date.month, date.day,
                                        check_out_dt.hour, check_out_dt.minute)
-            ok = push_worklog_to_clockify(r.task, start_dt, end_dt)
+            if r.clockify_entry_id:
+                ok = update_time_entry_in_clockify(r.clockify_entry_id, r.task, start_dt, end_dt)
+            else:
+                entry_id = push_worklog_to_clockify(r.task, start_dt, end_dt)
+                ok = entry_id is not None
+                if ok and r.id is not None:
+                    update_clockify_entry_id(r.id, entry_id)
             self.log_pushing_output(duration, ok, r.task)
 
         self.log_text.append('Done')

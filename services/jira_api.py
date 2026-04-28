@@ -32,16 +32,32 @@ def clear_jira_cache() -> None:
     get_project_name.cache_clear()
 
 
-def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, duration: datetime.timedelta) -> bool:
+def push_worklog_to_jira(issue_key: str, start_datetime: datetime.datetime, duration: datetime.timedelta) -> str | None:
     try:
         t = int(duration.total_seconds())
-        timeSpent = str(t)
-
-        get_jira().add_worklog(issue_key, timeSpentSeconds=timeSpent, started=start_datetime)
-        return True
+        worklog = get_jira().add_worklog(issue_key, timeSpentSeconds=str(t), started=start_datetime)
+        return worklog.id
     except Exception as e:
         print(f"Error pushing worklog to Jira: {e}")
+    return None
 
+
+def update_worklog_in_jira(
+    issue_key: str,
+    worklog_id: str,
+    start_datetime: datetime.datetime,
+    duration: datetime.timedelta,
+) -> bool:
+    try:
+        t = int(duration.total_seconds())
+        worklog = get_jira().worklog(issue_key, worklog_id)
+        worklog.update(fields={
+            "timeSpentSeconds": t,
+            "started": start_datetime.strftime("%Y-%m-%dT%H:%M:%S.000+0000"),
+        })
+        return True
+    except Exception as e:
+        print(f"Error updating worklog in Jira: {e}")
     return False
 
 
