@@ -79,7 +79,7 @@ def log_time_in_clockify(
     task_key: str,
     start_time: datetime,
     end_time: datetime,
-) -> bool:
+) -> str | None:
     config = _get_config()
     url = f'{config.url}/{config.workspace}/time-entries'
     data = {
@@ -90,8 +90,37 @@ def log_time_in_clockify(
         'projectId': project_id,
         'taskId': task_id,
     }
-    response = requests.post(url, json=data, headers=config.headers)    
-    return response.ok
+    response = requests.post(url, json=data, headers=config.headers)
+    return response.json().get('id') if response.ok else None
+
+
+def update_time_entry_in_clockify(
+    entry_id: str,
+    task_key: str,
+    start_time: datetime,
+    end_time: datetime,
+) -> bool:
+    try:
+        config = _get_config()
+        project_key = task_key.split('-')[0]
+        project_name = get_project_name(project_key)
+        project_id = find_clockify_project(project_name)
+        task_id = find_or_create_clockify_task(project_id, task_key)
+
+        url = f'{config.url}/{config.workspace}/time-entries/{entry_id}'
+        data = {
+            'start': convert_datetime_to_utc(start_time),
+            'end': convert_datetime_to_utc(end_time),
+            'billable': True,
+            'description': task_key,
+            'projectId': project_id,
+            'taskId': task_id,
+        }
+        response = requests.put(url, json=data, headers=config.headers)
+        return response.ok
+    except Exception as e:
+        print(f"Error updating Clockify entry: {e}")
+    return False
 
 
 def clear_clockify_cache() -> None:
@@ -104,7 +133,7 @@ def push_worklog_to_clockify(
     task_key: str,
     start_time: datetime,
     end_time: datetime,
-) -> bool:
+) -> str | None:
 
     try:
         project_key = task_key.split('-')[0]
@@ -113,6 +142,6 @@ def push_worklog_to_clockify(
 
         task_id = find_or_create_clockify_task(project_id, task_key)
     except ClockingException:
-        return False
+        return None
 
     return log_time_in_clockify(project_id, task_id, task_key, start_time, end_time)

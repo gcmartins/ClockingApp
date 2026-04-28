@@ -219,6 +219,7 @@ class TestPushToJira:
         import windows.clocking_summary as cs
         monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
         monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+        monkeypatch.setattr(cs, 'update_jira_worklog_id', lambda row_id, wl_id: None)
 
         records = [
             make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
@@ -228,7 +229,7 @@ class TestPushToJira:
 
         push_calls = []
         monkeypatch.setattr(cs, 'push_worklog_to_jira',
-                            lambda task, start, duration: push_calls.append(task) or True)
+                            lambda task, start, duration: push_calls.append(task) or 'wl-id')
 
         widget = ClockingSummary([])
         widget.push_to_jira(TODAY_STR)
@@ -247,7 +248,7 @@ class TestPushToJira:
 
         push_calls = []
         monkeypatch.setattr(cs, 'push_worklog_to_jira',
-                            lambda task, start, duration: push_calls.append(task) or True)
+                            lambda task, start, duration: push_calls.append(task) or 'wl-id')
 
         widget = ClockingSummary([])
         widget.push_to_jira(TODAY_STR)
@@ -260,6 +261,7 @@ class TestPushToJira:
         import windows.clocking_summary as cs
         monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
         monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+        monkeypatch.setattr(cs, 'update_jira_worklog_id', lambda row_id, wl_id: None)
 
         records = [
             make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
@@ -267,7 +269,7 @@ class TestPushToJira:
         ]
         monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: records)
 
-        results = iter([True, False])
+        results = iter(['wl-id-1', None])
         monkeypatch.setattr(cs, 'push_worklog_to_jira',
                             lambda task, start, duration: next(results))
 
@@ -276,6 +278,51 @@ class TestPushToJira:
         log = widget.log_text.toHtml()
         assert 'Success' in log
         assert 'Fail' in log
+        widget.close()
+
+    def test_calls_update_when_jira_worklog_id_exists(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_jira_configured.return_value = (True, [])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        record = make_record(TODAY_STR, 'TASK-1', '09:00', '10:00', id=1)
+        record.jira_worklog_id = 'existing-wl-99'
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [record])
+
+        update_calls = []
+        monkeypatch.setattr(cs, 'update_worklog_in_jira',
+                            lambda task, wl_id, start, dur: update_calls.append((task, wl_id)) or True)
+        create_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_jira',
+                            lambda task, start, dur: create_calls.append(task) or 'new-id')
+
+        widget = ClockingSummary([])
+        widget.push_to_jira(TODAY_STR)
+        assert update_calls == [('TASK-1', 'existing-wl-99')]
+        assert create_calls == []
+        widget.close()
+
+    def test_saves_jira_worklog_id_after_create(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_jira_configured.return_value = (True, [])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        record = make_record(TODAY_STR, 'TASK-1', '09:00', '10:00', id=42)
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [record])
+        monkeypatch.setattr(cs, 'push_worklog_to_jira',
+                            lambda task, start, dur: 'new-worklog-id')
+
+        saved = {}
+        monkeypatch.setattr(cs, 'update_jira_worklog_id',
+                            lambda row_id, wl_id: saved.update({row_id: wl_id}))
+
+        widget = ClockingSummary([])
+        widget.push_to_jira(TODAY_STR)
+        assert saved == {42: 'new-worklog-id'}
         widget.close()
 
 
@@ -304,6 +351,7 @@ class TestPushToClockify:
         import windows.clocking_summary as cs
         monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
         monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+        monkeypatch.setattr(cs, 'update_clockify_entry_id', lambda row_id, eid: None)
 
         records = [
             make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
@@ -313,7 +361,7 @@ class TestPushToClockify:
 
         push_calls = []
         monkeypatch.setattr(cs, 'push_worklog_to_clockify',
-                            lambda task, start, end: push_calls.append(task) or True)
+                            lambda task, start, end: push_calls.append(task) or 'entry-id')
 
         widget = ClockingSummary([])
         widget.push_to_clockify(TODAY_STR)
@@ -330,9 +378,54 @@ class TestPushToClockify:
 
         push_calls = []
         monkeypatch.setattr(cs, 'push_worklog_to_clockify',
-                            lambda task, start, end: push_calls.append(task) or True)
+                            lambda task, start, end: push_calls.append(task) or 'entry-id')
 
         widget = ClockingSummary([])
         widget.push_to_clockify(TODAY_STR)
         assert push_calls == []
+        widget.close()
+
+    def test_calls_update_when_clockify_entry_id_exists(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_clockify_configured.return_value = (True, [])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        record = make_record(TODAY_STR, 'TASK-1', '09:00', '10:00', id=1)
+        record.clockify_entry_id = 'existing-entry-99'
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [record])
+
+        update_calls = []
+        monkeypatch.setattr(cs, 'update_time_entry_in_clockify',
+                            lambda eid, task, start, end: update_calls.append((eid, task)) or True)
+        create_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_clockify',
+                            lambda task, start, end: create_calls.append(task) or 'new-id')
+
+        widget = ClockingSummary([])
+        widget.push_to_clockify(TODAY_STR)
+        assert update_calls == [('existing-entry-99', 'TASK-1')]
+        assert create_calls == []
+        widget.close()
+
+    def test_saves_clockify_entry_id_after_create(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_clockify_configured.return_value = (True, [])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        record = make_record(TODAY_STR, 'TASK-1', '09:00', '10:00', id=55)
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [record])
+        monkeypatch.setattr(cs, 'push_worklog_to_clockify',
+                            lambda task, start, end: 'new-entry-id')
+
+        saved = {}
+        monkeypatch.setattr(cs, 'update_clockify_entry_id',
+                            lambda row_id, eid: saved.update({row_id: eid}))
+
+        widget = ClockingSummary([])
+        widget.push_to_clockify(TODAY_STR)
+        assert saved == {55: 'new-entry-id'}
         widget.close()

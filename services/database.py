@@ -18,6 +18,8 @@ class ClockingRecord:
     check_out: str | None    # YYYY-MM-DD HH:MM or None
     message: str | None
     id: int | None = None
+    jira_worklog_id: str | None = None
+    clockify_entry_id: str | None = None
 
     @property
     def check_in_time(self) -> str:
@@ -81,6 +83,8 @@ def _clocking_from_row(row: sqlite3.Row) -> ClockingRecord:
         check_in=row['check_in'],
         check_out=row['check_out'],
         message=row['message'],
+        jira_worklog_id=row['jira_worklog_id'],
+        clockify_entry_id=row['clockify_entry_id'],
     )
 
 
@@ -103,6 +107,15 @@ def _task_duration_from_row(row: sqlite3.Row) -> TaskDuration:
 # Schema initialisation
 # ---------------------------------------------------------------------------
 
+def _migrate_db() -> None:
+    with _get_connection() as conn:
+        for col in ("jira_worklog_id", "clockify_entry_id"):
+            try:
+                conn.execute(f"ALTER TABLE clockings ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass  # column already exists
+
+
 def init_db() -> None:
     """Create tables if they do not yet exist."""
     with _get_connection() as conn:
@@ -123,6 +136,7 @@ def init_db() -> None:
                     CHECK(task_type IN ('fixed', 'open', 'closed'))
             );
         """)
+    _migrate_db()
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +147,7 @@ def get_all_clockings() -> list[ClockingRecord]:
     """Return all clocking rows ordered by check_in."""
     with _get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, date, task, check_in, check_out, message "
+            "SELECT id, date, task, check_in, check_out, message, jira_worklog_id, clockify_entry_id "
             "FROM clockings ORDER BY check_in"
         ).fetchall()
     return [_clocking_from_row(r) for r in rows]
@@ -143,7 +157,7 @@ def get_clockings_for_date(date: str) -> list[ClockingRecord]:
     """Return completed clocking rows for a given date (YYYY-MM-DD)."""
     with _get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, date, task, check_in, check_out, message "
+            "SELECT id, date, task, check_in, check_out, message, jira_worklog_id, clockify_entry_id "
             "FROM clockings WHERE date = ? AND check_out IS NOT NULL "
             "ORDER BY check_in",
             (date,),
@@ -155,7 +169,7 @@ def get_open_clocking() -> ClockingRecord | None:
     """Return the clocking row with no check_out (the active session), or None."""
     with _get_connection() as conn:
         row = conn.execute(
-            "SELECT id, date, task, check_in, check_out, message "
+            "SELECT id, date, task, check_in, check_out, message, jira_worklog_id, clockify_entry_id "
             "FROM clockings WHERE check_out IS NULL ORDER BY id DESC LIMIT 1"
         ).fetchone()
     return _clocking_from_row(row) if row else None
@@ -208,19 +222,46 @@ def update_check_out(row_id: int, check_out: str) -> None:
         )
 
 
+def update_jira_worklog_id(row_id: int, jira_worklog_id: str) -> None:
+    """Persist the Jira worklog ID returned after a successful push."""
+    with _get_connection() as conn:
+        conn.execute(
+            "UPDATE clockings SET jira_worklog_id = ? WHERE id = ?",
+            (jira_worklog_id, row_id),
+        )
+
+
+def update_clockify_entry_id(row_id: int, clockify_entry_id: str) -> None:
+    """Persist the Clockify time entry ID returned after a successful push."""
+    with _get_connection() as conn:
+        conn.execute(
+            "UPDATE clockings SET clockify_entry_id = ? WHERE id = ?",
+            (clockify_entry_id, row_id),
+        )
+
+
 def upsert_clocking(record: ClockingRecord) -> int:
     """Insert or update a single clocking row. Returns the row id."""
     with _get_connection() as conn:
         if record.id:
-            conn.execute(
-                "UPDATE clockings SET date=?, task=?, check_in=?, check_out=?, message=? WHERE id=?",
-                (record.date, record.task, record.check_in, record.check_out, record.message, record.id),
-            )
+            fields = "date=?, task=?, check_in=?, check_out=?, message=?"
+            params: list = [record.date, record.task, record.check_in,
+                            record.check_out, record.message]
+            if record.jira_worklog_id is not None:
+                fields += ", jira_worklog_id=?"
+                params.append(record.jira_worklog_id)
+            if record.clockify_entry_id is not None:
+                fields += ", clockify_entry_id=?"
+                params.append(record.clockify_entry_id)
+            params.append(record.id)
+            conn.execute(f"UPDATE clockings SET {fields} WHERE id=?", params)
             return record.id
         else:
             cursor = conn.execute(
-                "INSERT INTO clockings (date, task, check_in, check_out, message) VALUES (?, ?, ?, ?, ?)",
-                (record.date, record.task, record.check_in, record.check_out, record.message),
+                "INSERT INTO clockings (date, task, check_in, check_out, message, jira_worklog_id, clockify_entry_id) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (record.date, record.task, record.check_in, record.check_out,
+                 record.message, record.jira_worklog_id, record.clockify_entry_id),
             )
             return cursor.lastrowid if cursor.lastrowid is not None else 0
 
@@ -235,10 +276,11 @@ def save_clockings(records: list[ClockingRecord]) -> None:
     """Replace the entire clockings table with the supplied records."""
     with _get_connection() as conn:
         conn.executemany(
-            "INSERT INTO clockings (id, date, task, check_in, check_out, message) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO clockings (id, date, task, check_in, check_out, message, jira_worklog_id, clockify_entry_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [
-                (r.id, r.date, r.task, r.check_in, r.check_out, r.message)
+                (r.id, r.date, r.task, r.check_in, r.check_out, r.message,
+                 r.jira_worklog_id, r.clockify_entry_id)
                 for r in records
             ],
         )
