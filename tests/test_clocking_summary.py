@@ -336,3 +336,62 @@ class TestPushToClockify:
         widget.push_to_clockify(TODAY_STR)
         assert push_calls == []
         widget.close()
+
+
+# ---------------------------------------------------------------------------
+# TestPushToKimai
+# ---------------------------------------------------------------------------
+
+class TestPushToKimai:
+    def test_logs_not_configured_when_kimai_missing(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_kimai_configured.return_value = (False, ['KIMAI_API_TOKEN'])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [])
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        widget = ClockingSummary([])
+        widget.push_to_kimai(TODAY_STR)
+        log = widget.log_text.toPlainText()
+        assert 'not configured' in log.lower() or 'Kimai' in log
+        widget.close()
+
+    def test_calls_push_api_for_each_completed_row(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_kimai_configured.return_value = (True, [])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        records = [
+            make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
+            make_record(TODAY_STR, 'TASK-2', '11:00', '12:00'),
+        ]
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: records)
+
+        push_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_kimai',
+                            lambda task, start, end: push_calls.append(task) or True)
+
+        widget = ClockingSummary([])
+        widget.push_to_kimai(TODAY_STR)
+        assert len(push_calls) == 2
+        widget.close()
+
+    def test_skips_rows_without_checkout(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_kimai_configured.return_value = (True, [])
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [])
+
+        push_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_kimai',
+                            lambda task, start, end: push_calls.append(task) or True)
+
+        widget = ClockingSummary([])
+        widget.push_to_kimai(TODAY_STR)
+        assert push_calls == []
+        widget.close()

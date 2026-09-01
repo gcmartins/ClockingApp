@@ -74,7 +74,9 @@ class TestConfigManager:
             config.set('ATLASSIAN_URL', 'https://test.atlassian.net')
             config.set('CLOCKIFY_WORKSPACE', 'test_workspace')
             config.set('CLOCKIFY_API_KEY', 'test_api_key')
-            
+            config.set('KIMAI_URL', 'https://kimai.example.com')
+            config.set('KIMAI_API_TOKEN', 'test_api_token')
+
             is_valid, missing = config.is_valid()
             assert is_valid is True
             assert len(missing) == 0
@@ -124,6 +126,20 @@ class TestConfigManager:
             assert is_valid is True
             assert len(missing) == 0
     
+    def test_is_kimai_configured(self):
+        """Test Kimai-specific validation"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = os.path.join(tmpdir, '.env')
+            config = ConfigManager(env_path)
+
+            # Set only Kimai values
+            config.set('KIMAI_URL', 'https://kimai.example.com')
+            config.set('KIMAI_API_TOKEN', 'test_api_token')
+
+            is_valid, missing = config.is_kimai_configured()
+            assert is_valid is True
+            assert len(missing) == 0
+
     def test_update_all(self):
         """Test bulk update of configuration"""
         with tempfile.TemporaryDirectory() as tmpdir:

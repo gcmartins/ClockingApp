@@ -11,7 +11,7 @@ A desktop time tracking application that stores clockings in a local SQLite data
 - Manage tasks (create, edit, delete) with fixed or Jira-linked types
 - View clocking history and a 7-day summary report
 - Generate end-of-day (EOD) reports with per-task messages
-- Push time entries to Jira worklogs and/or Clockify
+- Push time entries to Jira worklogs, Clockify, and/or Kimai
 - Pull assigned Jira issues to populate available tasks
 - System tray support for quick minimize/restore
 
@@ -56,7 +56,7 @@ The application works without any API configuration for basic time tracking.
 
 ### Optional API Integration
 
-To enable Jira and/or Clockify integration, open **Menu → Settings** and fill in the relevant credentials. You can also create a `.env` file manually in the project directory:
+To enable Jira, Clockify, and/or Kimai integration, open **Menu → Settings** and fill in the relevant credentials. You can also create a `.env` file manually in the project directory:
 
 ```text
 ATLASSIAN_EMAIL=your@email.com
@@ -64,6 +64,8 @@ ATLASSIAN_TOKEN=<YOUR_JIRA_TOKEN>
 ATLASSIAN_URL=https://yourcompany.atlassian.net
 CLOCKIFY_WORKSPACE=<YOUR_CLOCKIFY_WORKSPACE_ID>
 CLOCKIFY_API_KEY=<YOUR_CLOCKIFY_API_KEY>
+KIMAI_URL=https://your-kimai-instance.example.com
+KIMAI_API_TOKEN=<YOUR_KIMAI_API_TOKEN>
 JIRA_TASK_PREFIX=PREFIX1, PREFIX2   # Optional — filter pulled tasks by prefix
 ```
 
@@ -91,13 +93,24 @@ Configure via **Menu → Settings → Clockify** or the `.env` file:
 
 **Enabled features:** Push time entries to Clockify (auto-creates projects and tasks as needed).
 
+### Kimai Integration (Optional)
+
+Configure via **Menu → Settings → Kimai** or the `.env` file:
+
+| Field | Description |
+|---|---|
+| `KIMAI_URL` | Your Kimai instance URL (e.g., `https://your-kimai-instance.example.com`) |
+| `KIMAI_API_TOKEN` | Personal API token, generated from your Kimai profile page (user menu → API access) |
+
+**Enabled features:** Push time entries to Kimai (auto-creates activities as needed).
+
 ## Menu Reference
 
 | Menu Item | Description |
 |---|---|
-| **Clocking Summary** | 7-day summary view with per-task durations and push-to-Jira/Clockify buttons |
+| **Clocking Summary** | 7-day summary view with per-task durations and push-to-Jira/Clockify/Kimai buttons |
 | **Update Open Tasks** | Fetch assigned Jira issues and sync them as available tasks |
 | **Manage Tasks** | Create, edit, or delete tasks |
 | **EOD Report** | Generate an end-of-day report with task messages |
-| **Settings** | Configure Jira and Clockify credentials |
+| **Settings** | Configure Jira, Clockify, and Kimai credentials |
 | **Exit** | Quit the application (`Ctrl+Q`) |

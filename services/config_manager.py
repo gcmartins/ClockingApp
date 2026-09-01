@@ -11,7 +11,8 @@ class ConfigManager:
     # Required configuration keys
     REQUIRED_JIRA_KEYS = ['ATLASSIAN_EMAIL', 'ATLASSIAN_TOKEN', 'ATLASSIAN_URL']
     REQUIRED_CLOCKIFY_KEYS = ['CLOCKIFY_WORKSPACE', 'CLOCKIFY_API_KEY']
-    ALL_REQUIRED_KEYS = REQUIRED_JIRA_KEYS + REQUIRED_CLOCKIFY_KEYS
+    REQUIRED_KIMAI_KEYS = ['KIMAI_URL', 'KIMAI_API_TOKEN']
+    ALL_REQUIRED_KEYS = REQUIRED_JIRA_KEYS + REQUIRED_CLOCKIFY_KEYS + REQUIRED_KIMAI_KEYS
 
     # Optional configuration keys
     OPTIONAL_KEYS = ['JIRA_TASK_PREFIX']
@@ -132,6 +133,15 @@ class ConfigManager:
             Tuple of (is_valid, list of missing keys)
         """
         return self._is_configured(self.REQUIRED_CLOCKIFY_KEYS)
+
+    def is_kimai_configured(self) -> tuple[bool, list[str]]:
+        """
+        Check if Kimai configuration is complete
+
+        Returns:
+            Tuple of (is_valid, list of missing keys)
+        """
+        return self._is_configured(self.REQUIRED_KIMAI_KEYS)
 
 
 # Global instance

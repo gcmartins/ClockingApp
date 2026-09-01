@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 from services.clockify_api import clear_clockify_cache
 from services.config_manager import get_config_manager
 from services.jira_api import clear_jira_cache
+from services.kimai_api import clear_kimai_cache
 
 
 class SettingsDialog(QDialog):
@@ -64,7 +65,18 @@ class SettingsDialog(QDialog):
         
         clockify_tab.setLayout(clockify_layout)
         tabs.addTab(clockify_tab, "Clockify")
-        
+
+        # Kimai settings tab
+        kimai_tab = QWidget()
+        kimai_layout = QVBoxLayout()
+
+        kimai_group = self.create_kimai_group()
+        kimai_layout.addWidget(kimai_group)
+        kimai_layout.addStretch()
+
+        kimai_tab.setLayout(kimai_layout)
+        tabs.addTab(kimai_tab, "Kimai")
+
         layout.addWidget(tabs)
         
         # Buttons
@@ -169,7 +181,46 @@ class SettingsDialog(QDialog):
         
         group.setLayout(form_layout)
         return group
-    
+
+    def create_kimai_group(self) -> QGroupBox:
+        """Create Kimai settings group"""
+        group = QGroupBox("Kimai Configuration")
+        form_layout = QFormLayout()
+
+        # URL
+        self.kimai_url_input = QLineEdit()
+        self.kimai_url_input.setPlaceholderText("https://your-kimai-instance.example.com")
+        form_layout.addRow("Kimai URL:", self.kimai_url_input)
+
+        # API Token with show/hide button
+        self.kimai_api_token_input = QLineEdit()
+        self.kimai_api_token_input.setEchoMode(QLineEdit.EchoMode.Password)
+        self.kimai_api_token_input.setPlaceholderText("Your Kimai API token")
+
+        show_kimai_token_btn = QPushButton("Show")
+        show_kimai_token_btn.setCheckable(True)
+        show_kimai_token_btn.toggled.connect(
+            lambda checked: self.toggle_password_visibility(
+                self.kimai_api_token_input, show_kimai_token_btn, checked
+            )
+        )
+        token_layout = QHBoxLayout()
+        token_layout.addWidget(self.kimai_api_token_input)
+        token_layout.addWidget(show_kimai_token_btn)
+        form_layout.addRow("API Token:", token_layout)
+
+        # Help text
+        help_label = QLabel(
+            '<small>To get your API token, open your Kimai profile page '
+            "(user menu → API access) and generate a personal API token.</small>"
+        )
+        help_label.setOpenExternalLinks(True)
+        help_label.setWordWrap(True)
+        form_layout.addRow("", help_label)
+
+        group.setLayout(form_layout)
+        return group
+
     def toggle_password_visibility(self, line_edit: QLineEdit, button: QPushButton, show: bool):
         """Toggle password visibility for a line edit"""
         if show:
@@ -187,7 +238,9 @@ class SettingsDialog(QDialog):
         self.jira_task_prefix_input.setText(self.config_manager.get('JIRA_TASK_PREFIX'))
         self.clockify_workspace_input.setText(self.config_manager.get('CLOCKIFY_WORKSPACE'))
         self.clockify_api_key_input.setText(self.config_manager.get('CLOCKIFY_API_KEY'))
-    
+        self.kimai_url_input.setText(self.config_manager.get('KIMAI_URL'))
+        self.kimai_api_token_input.setText(self.config_manager.get('KIMAI_API_TOKEN'))
+
     def save_settings(self):
         """Save settings to config manager and close dialog"""
         # Get values from inputs
@@ -198,15 +251,18 @@ class SettingsDialog(QDialog):
             'JIRA_TASK_PREFIX': self.jira_task_prefix_input.text().strip(),
             'CLOCKIFY_WORKSPACE': self.clockify_workspace_input.text().strip(),
             'CLOCKIFY_API_KEY': self.clockify_api_key_input.text().strip(),
+            'KIMAI_URL': self.kimai_url_input.text().strip(),
+            'KIMAI_API_TOKEN': self.kimai_api_token_input.text().strip(),
         }
-        
+
         # Update config manager
         self.config_manager.update_all(settings)
-        
+
         # Save to file
         if self.config_manager.save():
             clear_jira_cache()
             clear_clockify_cache()
+            clear_kimai_cache()
             QMessageBox.information(
                 self,
                 "Settings Saved",
@@ -240,7 +296,8 @@ class SettingsDialog(QDialog):
             "The app works without API configuration for basic time tracking.<br><br>"
             "To enable additional features, you can optionally configure:<br>"
             "• <b>Jira</b> - For tracking issues and logging work<br>"
-            "• <b>Clockify</b> - For time tracking integration<br><br>"
+            "• <b>Clockify</b> - For time tracking integration<br>"
+            "• <b>Kimai</b> - For time tracking integration<br><br>"
             "You can configure these now or later via Menu → Settings."
         )
         welcome_label.setWordWrap(True)

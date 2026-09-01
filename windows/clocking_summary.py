@@ -12,6 +12,7 @@ from services.database import (
     get_task_durations_for_date,
 )
 from services.jira_api import push_worklog_to_jira
+from services.kimai_api import push_worklog_to_kimai
 from services.utils import format_timedelta, format_timedelta_jira
 
 _FMT = "%Y-%m-%d %H:%M"
@@ -55,6 +56,7 @@ class ClockingSummary(QWidget):
         def do_push_clockings():
             self.push_to_jira(day)
             self.push_to_clockify(day)
+            self.push_to_kimai(day)
         return do_push_clockings
 
     def push_to_jira(self, day: str) -> None:
@@ -107,6 +109,34 @@ class ClockingSummary(QWidget):
             end_dt = datetime.datetime(date.year, date.month, date.day,
                                        check_out_dt.hour, check_out_dt.minute)
             ok = push_worklog_to_clockify(r.task, start_dt, end_dt)
+            self.log_pushing_output(duration, ok, r.task)
+
+        self.log_text.append('Done')
+
+    def push_to_kimai(self, day: str) -> None:
+        config = get_config_manager()
+        is_configured, _ = config.is_kimai_configured()
+
+        if not is_configured:
+            self.log_text.append(
+                '<span style="color:red;">Kimai is not configured. '
+                'Please configure it in Menu → Settings.</span>'
+            )
+            return
+
+        date = datetime.date.fromisoformat(day)
+        self.log_text.append(f'Pushing {day} clocking to Kimai timesheet ...')
+
+        for r in get_clockings_for_date(day):
+            assert r.check_out is not None
+            check_in_dt = datetime.datetime.strptime(r.check_in, _FMT)
+            check_out_dt = datetime.datetime.strptime(r.check_out, _FMT)
+            duration = check_out_dt - check_in_dt
+            start_dt = datetime.datetime(date.year, date.month, date.day,
+                                         check_in_dt.hour, check_in_dt.minute)
+            end_dt = datetime.datetime(date.year, date.month, date.day,
+                                       check_out_dt.hour, check_out_dt.minute)
+            ok = push_worklog_to_kimai(r.task, start_dt, end_dt)
             self.log_pushing_output(duration, ok, r.task)
 
         self.log_text.append('Done')
