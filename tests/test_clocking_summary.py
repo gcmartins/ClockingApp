@@ -199,6 +199,28 @@ class TestComputeWeekTaskDuration:
 # ---------------------------------------------------------------------------
 
 class TestPushToJira:
+    def test_logs_disabled_and_skips_push_when_jira_disabled(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_jira_enabled.return_value = False
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [
+            make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
+        ])
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        push_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_jira',
+                            lambda task, start, duration: push_calls.append(task) or True)
+
+        widget = ClockingSummary([])
+        widget.push_to_jira(TODAY_STR)
+        log = widget.log_text.toPlainText()
+        assert 'disabled' in log.lower()
+        assert push_calls == []
+        mock_config.is_jira_configured.assert_not_called()
+        widget.close()
+
     def test_logs_not_configured_when_jira_missing(self, qt_app, monkeypatch):
         mock_config = MagicMock()
         mock_config.is_jira_configured.return_value = (False, ['ATLASSIAN_EMAIL'])
@@ -284,6 +306,28 @@ class TestPushToJira:
 # ---------------------------------------------------------------------------
 
 class TestPushToClockify:
+    def test_logs_disabled_and_skips_push_when_clockify_disabled(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_clockify_enabled.return_value = False
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [
+            make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
+        ])
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        push_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_clockify',
+                            lambda task, start, end: push_calls.append(task) or True)
+
+        widget = ClockingSummary([])
+        widget.push_to_clockify(TODAY_STR)
+        log = widget.log_text.toPlainText()
+        assert 'disabled' in log.lower()
+        assert push_calls == []
+        mock_config.is_clockify_configured.assert_not_called()
+        widget.close()
+
     def test_logs_not_configured_when_clockify_missing(self, qt_app, monkeypatch):
         mock_config = MagicMock()
         mock_config.is_clockify_configured.return_value = (False, ['CLOCKIFY_API_KEY'])
@@ -343,6 +387,28 @@ class TestPushToClockify:
 # ---------------------------------------------------------------------------
 
 class TestPushToKimai:
+    def test_logs_disabled_and_skips_push_when_kimai_disabled(self, qt_app, monkeypatch):
+        mock_config = MagicMock()
+        mock_config.is_kimai_enabled.return_value = False
+        import windows.clocking_summary as cs
+        monkeypatch.setattr(cs, 'get_config_manager', lambda: mock_config)
+        monkeypatch.setattr(cs, 'get_clockings_for_date', lambda d: [
+            make_record(TODAY_STR, 'TASK-1', '09:00', '10:00'),
+        ])
+        monkeypatch.setattr(cs, 'get_task_durations_for_date', lambda d: [])
+
+        push_calls = []
+        monkeypatch.setattr(cs, 'push_worklog_to_kimai',
+                            lambda task, start, end: push_calls.append(task) or True)
+
+        widget = ClockingSummary([])
+        widget.push_to_kimai(TODAY_STR)
+        log = widget.log_text.toPlainText()
+        assert 'disabled' in log.lower()
+        assert push_calls == []
+        mock_config.is_kimai_configured.assert_not_called()
+        widget.close()
+
     def test_logs_not_configured_when_kimai_missing(self, qt_app, monkeypatch):
         mock_config = MagicMock()
         mock_config.is_kimai_configured.return_value = (False, ['KIMAI_API_TOKEN'])

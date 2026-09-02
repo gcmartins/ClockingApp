@@ -69,6 +69,8 @@ KIMAI_API_TOKEN=<YOUR_KIMAI_API_TOKEN>
 JIRA_TASK_PREFIX=PREFIX1, PREFIX2   # Optional — filter pulled tasks by prefix
 ```
 
+Each integration's tab in **Menu → Settings** also has an **"Enable ... integration"** checkbox. Unchecking it disables that integration's API actions (pushing worklogs, and for Jira also pulling open issues) without discarding the saved credentials — handy for temporarily turning an integration off. The equivalent `.env` keys are `JIRA_ENABLED`, `CLOCKIFY_ENABLED`, and `KIMAI_ENABLED` (each defaults to enabled unless explicitly set to `false`).
+
 ### Jira Integration (Optional)
 
 Configure via **Menu → Settings → Jira** or the `.env` file:

@@ -15,7 +15,7 @@ class ConfigManager:
     ALL_REQUIRED_KEYS = REQUIRED_JIRA_KEYS + REQUIRED_CLOCKIFY_KEYS + REQUIRED_KIMAI_KEYS
 
     # Optional configuration keys
-    OPTIONAL_KEYS = ['JIRA_TASK_PREFIX']
+    OPTIONAL_KEYS = ['JIRA_TASK_PREFIX', 'JIRA_ENABLED', 'CLOCKIFY_ENABLED', 'KIMAI_ENABLED']
     
     def __init__(self, env_path: str | None = None):
         """
@@ -107,6 +107,10 @@ class ConfigManager:
         missing_keys = [key for key in keys if not self._config.get(key, '').strip()]
         return len(missing_keys) == 0, missing_keys
 
+    def _is_enabled(self, key: str) -> bool:
+        """An integration switch is enabled unless explicitly set to 'false'."""
+        return self._config.get(key, '').strip().lower() != 'false'
+
     def is_valid(self) -> tuple[bool, list[str]]:
         """
         Check if all required configuration is present and non-empty
@@ -142,6 +146,18 @@ class ConfigManager:
             Tuple of (is_valid, list of missing keys)
         """
         return self._is_configured(self.REQUIRED_KIMAI_KEYS)
+
+    def is_jira_enabled(self) -> bool:
+        """Check if the Jira integration switch is enabled (default: enabled)"""
+        return self._is_enabled('JIRA_ENABLED')
+
+    def is_clockify_enabled(self) -> bool:
+        """Check if the Clockify integration switch is enabled (default: enabled)"""
+        return self._is_enabled('CLOCKIFY_ENABLED')
+
+    def is_kimai_enabled(self) -> bool:
+        """Check if the Kimai integration switch is enabled (default: enabled)"""
+        return self._is_enabled('KIMAI_ENABLED')
 
 
 # Global instance

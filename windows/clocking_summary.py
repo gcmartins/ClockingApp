@@ -61,6 +61,14 @@ class ClockingSummary(QWidget):
 
     def push_to_jira(self, day: str) -> None:
         config = get_config_manager()
+
+        if not config.is_jira_enabled():
+            self.log_text.append(
+                '<span style="color:gray;">Jira integration is disabled. '
+                'Enable it in Menu → Settings.</span>'
+            )
+            return
+
         is_configured, _ = config.is_jira_configured()
 
         if not is_configured:
@@ -87,6 +95,14 @@ class ClockingSummary(QWidget):
 
     def push_to_clockify(self, day: str) -> None:
         config = get_config_manager()
+
+        if not config.is_clockify_enabled():
+            self.log_text.append(
+                '<span style="color:gray;">Clockify integration is disabled. '
+                'Enable it in Menu → Settings.</span>'
+            )
+            return
+
         is_configured, _ = config.is_clockify_configured()
 
         if not is_configured:
@@ -115,6 +131,14 @@ class ClockingSummary(QWidget):
 
     def push_to_kimai(self, day: str) -> None:
         config = get_config_manager()
+
+        if not config.is_kimai_enabled():
+            self.log_text.append(
+                '<span style="color:gray;">Kimai integration is disabled. '
+                'Enable it in Menu → Settings.</span>'
+            )
+            return
+
         is_configured, _ = config.is_kimai_configured()
 
         if not is_configured:

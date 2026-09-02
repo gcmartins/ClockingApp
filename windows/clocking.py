@@ -179,6 +179,15 @@ class MainClocking(QMainWindow):
 
     def update_open_tasks(self):
         config = get_config_manager()
+
+        if not config.is_jira_enabled():
+            QMessageBox.warning(
+                self,
+                "Jira Disabled",
+                "Jira integration is disabled. Enable it in Menu → Settings to use this feature."
+            )
+            return
+
         is_configured, _ = config.is_jira_configured()
 
         if not is_configured:

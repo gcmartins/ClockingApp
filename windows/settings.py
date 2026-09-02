@@ -1,4 +1,5 @@
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFormLayout,
     QGroupBox,
@@ -99,7 +100,11 @@ class SettingsDialog(QDialog):
         """Create Jira settings group"""
         group = QGroupBox("Jira Configuration")
         form_layout = QFormLayout()
-        
+
+        # Enable/disable switch
+        self.jira_enabled_checkbox = QCheckBox("Enable Jira integration")
+        form_layout.addRow(self.jira_enabled_checkbox)
+
         # Email
         self.jira_email_input = QLineEdit()
         self.jira_email_input.setPlaceholderText("your@email.com")
@@ -147,7 +152,11 @@ class SettingsDialog(QDialog):
         """Create Clockify settings group"""
         group = QGroupBox("Clockify Configuration")
         form_layout = QFormLayout()
-        
+
+        # Enable/disable switch
+        self.clockify_enabled_checkbox = QCheckBox("Enable Clockify integration")
+        form_layout.addRow(self.clockify_enabled_checkbox)
+
         # Workspace
         self.clockify_workspace_input = QLineEdit()
         self.clockify_workspace_input.setPlaceholderText("Your workspace ID")
@@ -186,6 +195,10 @@ class SettingsDialog(QDialog):
         """Create Kimai settings group"""
         group = QGroupBox("Kimai Configuration")
         form_layout = QFormLayout()
+
+        # Enable/disable switch
+        self.kimai_enabled_checkbox = QCheckBox("Enable Kimai integration")
+        form_layout.addRow(self.kimai_enabled_checkbox)
 
         # URL
         self.kimai_url_input = QLineEdit()
@@ -232,12 +245,15 @@ class SettingsDialog(QDialog):
     
     def load_current_settings(self):
         """Load current settings from config manager"""
+        self.jira_enabled_checkbox.setChecked(self.config_manager.is_jira_enabled())
         self.jira_email_input.setText(self.config_manager.get('ATLASSIAN_EMAIL'))
         self.jira_token_input.setText(self.config_manager.get('ATLASSIAN_TOKEN'))
         self.jira_url_input.setText(self.config_manager.get('ATLASSIAN_URL'))
         self.jira_task_prefix_input.setText(self.config_manager.get('JIRA_TASK_PREFIX'))
+        self.clockify_enabled_checkbox.setChecked(self.config_manager.is_clockify_enabled())
         self.clockify_workspace_input.setText(self.config_manager.get('CLOCKIFY_WORKSPACE'))
         self.clockify_api_key_input.setText(self.config_manager.get('CLOCKIFY_API_KEY'))
+        self.kimai_enabled_checkbox.setChecked(self.config_manager.is_kimai_enabled())
         self.kimai_url_input.setText(self.config_manager.get('KIMAI_URL'))
         self.kimai_api_token_input.setText(self.config_manager.get('KIMAI_API_TOKEN'))
 
@@ -245,12 +261,15 @@ class SettingsDialog(QDialog):
         """Save settings to config manager and close dialog"""
         # Get values from inputs
         settings = {
+            'JIRA_ENABLED': 'true' if self.jira_enabled_checkbox.isChecked() else 'false',
             'ATLASSIAN_EMAIL': self.jira_email_input.text().strip(),
             'ATLASSIAN_TOKEN': self.jira_token_input.text().strip(),
             'ATLASSIAN_URL': self.jira_url_input.text().strip(),
             'JIRA_TASK_PREFIX': self.jira_task_prefix_input.text().strip(),
+            'CLOCKIFY_ENABLED': 'true' if self.clockify_enabled_checkbox.isChecked() else 'false',
             'CLOCKIFY_WORKSPACE': self.clockify_workspace_input.text().strip(),
             'CLOCKIFY_API_KEY': self.clockify_api_key_input.text().strip(),
+            'KIMAI_ENABLED': 'true' if self.kimai_enabled_checkbox.isChecked() else 'false',
             'KIMAI_URL': self.kimai_url_input.text().strip(),
             'KIMAI_API_TOKEN': self.kimai_api_token_input.text().strip(),
         }

@@ -126,6 +126,39 @@ class TestConfigManager:
             assert is_valid is True
             assert len(missing) == 0
     
+    def test_integration_enabled_by_default(self):
+        """Enable switches default to True when never set"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = os.path.join(tmpdir, '.env')
+            config = ConfigManager(env_path)
+
+            assert config.is_jira_enabled() is True
+            assert config.is_clockify_enabled() is True
+            assert config.is_kimai_enabled() is True
+
+    def test_integration_disabled_when_set_to_false(self):
+        """Enable switches are False only when explicitly set to 'false'"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = os.path.join(tmpdir, '.env')
+            config = ConfigManager(env_path)
+
+            config.set('JIRA_ENABLED', 'false')
+            config.set('CLOCKIFY_ENABLED', 'false')
+            config.set('KIMAI_ENABLED', 'false')
+
+            assert config.is_jira_enabled() is False
+            assert config.is_clockify_enabled() is False
+            assert config.is_kimai_enabled() is False
+
+    def test_integration_enabled_when_set_to_true(self):
+        """Enable switches are True when explicitly set to 'true'"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            env_path = os.path.join(tmpdir, '.env')
+            config = ConfigManager(env_path)
+
+            config.set('JIRA_ENABLED', 'true')
+            assert config.is_jira_enabled() is True
+
     def test_is_kimai_configured(self):
         """Test Kimai-specific validation"""
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -51,6 +51,32 @@ class TestSettingsDialogLoad:
         assert dialog.kimai_url_input.text() == ""
         assert dialog.kimai_api_token_input.text() == ""
 
+    def test_empty_config_enables_all_integrations_by_default(self, dialog):
+        assert dialog.jira_enabled_checkbox.isChecked() is True
+        assert dialog.clockify_enabled_checkbox.isChecked() is True
+        assert dialog.kimai_enabled_checkbox.isChecked() is True
+
+    def test_load_current_settings_reflects_disabled_integrations(
+        self, qt_app, env_path, monkeypatch
+    ):
+        cfg = ConfigManager(env_path=env_path)
+        cfg.update_all({
+            'JIRA_ENABLED': 'false',
+            'CLOCKIFY_ENABLED': 'false',
+            'KIMAI_ENABLED': 'false',
+        })
+
+        import windows.settings as settings_module
+        monkeypatch.setattr(settings_module, "get_config_manager", lambda: cfg)
+
+        dlg = SettingsDialog(check_on_close=False)
+        try:
+            assert dlg.jira_enabled_checkbox.isChecked() is False
+            assert dlg.clockify_enabled_checkbox.isChecked() is False
+            assert dlg.kimai_enabled_checkbox.isChecked() is False
+        finally:
+            dlg.close()
+
     def test_load_current_settings_populates_fields(self, qt_app, env_path, monkeypatch):
         cfg = ConfigManager(env_path=env_path)
         cfg.update_all({
@@ -145,6 +171,29 @@ class TestSettingsDialogSave:
         assert saved_data['CLOCKIFY_API_KEY'] == 'clockify-key'
         assert saved_data['KIMAI_URL'] == 'https://kimai.test'
         assert saved_data['KIMAI_API_TOKEN'] == 'kimai-token'
+        assert saved_data['JIRA_ENABLED'] == 'true'
+        assert saved_data['CLOCKIFY_ENABLED'] == 'true'
+        assert saved_data['KIMAI_ENABLED'] == 'true'
+
+    def test_save_persists_disabled_integrations(self, dialog, config, monkeypatch):
+        dialog.jira_enabled_checkbox.setChecked(False)
+        dialog.clockify_enabled_checkbox.setChecked(False)
+        dialog.kimai_enabled_checkbox.setChecked(False)
+
+        saved_data = {}
+        monkeypatch.setattr(config, "update_all", lambda d: saved_data.update(d))
+        monkeypatch.setattr(config, "save", lambda: True)
+        import windows.settings as settings_module
+        monkeypatch.setattr(settings_module, "clear_jira_cache", lambda: None)
+        monkeypatch.setattr(settings_module, "clear_clockify_cache", lambda: None)
+        monkeypatch.setattr(settings_module, "clear_kimai_cache", lambda: None)
+        monkeypatch.setattr(QMessageBox, "information", staticmethod(lambda *a, **kw: None))
+
+        dialog.save_settings()
+
+        assert saved_data['JIRA_ENABLED'] == 'false'
+        assert saved_data['CLOCKIFY_ENABLED'] == 'false'
+        assert saved_data['KIMAI_ENABLED'] == 'false'
 
     def test_save_strips_whitespace(self, dialog, config, monkeypatch):
         dialog.jira_email_input.setText("  user@test.com  ")
