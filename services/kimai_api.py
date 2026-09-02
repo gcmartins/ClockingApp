@@ -7,6 +7,8 @@ from services.config_manager import get_config_manager
 from services.exceptions import ClockingException
 from services.jira_api import get_project_name
 
+KIMAI_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
 
 class KimaiConfig:
     def __init__(self, url, api_token):
@@ -55,7 +57,7 @@ def find_or_create_kimai_activity(project_id: int, activity_name: str) -> int:
     if len(activities):
         return activities[0]['id']
 
-    data = {'name': activity_name, 'project': project_id}
+    data = {'name': activity_name, 'project': project_id, 'visible': True}
     response = requests.post(activities_url, json=data, headers=config.headers)
 
     if not response.ok:
@@ -65,7 +67,7 @@ def find_or_create_kimai_activity(project_id: int, activity_name: str) -> int:
 
 
 def format_kimai_datetime(dt: datetime) -> str:
-    return dt.astimezone().isoformat()
+    return dt.strftime(KIMAI_DATETIME_FORMAT)
 
 
 def log_time_in_kimai(
