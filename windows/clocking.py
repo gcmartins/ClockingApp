@@ -263,6 +263,10 @@ class Clocking(QWidget):
         self.load_data()
         self._is_checked_out = True
         self._overtime_message_showed = False
+        # DB-derived state cached so the per-second timer doesn't hit the DB
+        self._cached_date: str | None = None
+        self._completed_today = datetime.timedelta(0)
+        self._open_check_in: datetime.datetime | None = None
 
         self.timer = QTimer()
         self.worked_hours = datetime.timedelta(0)
@@ -573,7 +577,7 @@ class Clocking(QWidget):
             )
 
     def update_buttons(self):
-        self.get_today_worked_hours()
+        self._refresh_worked_hours_cache()
         for _, task in self.task_buttons.items():
             task.button.setEnabled(True)
         if self.started_task_id and self.started_task_id in self.task_buttons:
@@ -626,26 +630,32 @@ class Clocking(QWidget):
         msg_box.exec()
 
     def update_time(self):
-        self.worked_hours = self.get_today_worked_hours()
+        if self._cached_date != datetime.date.today().isoformat():
+            self._refresh_worked_hours_cache()
+        self.worked_hours = self._compute_worked_hours()
         assert self.timer_clocking_label is not None
         self.timer_clocking_label.setText(format_timedelta(self.worked_hours))
         self.warn_if_overtime()
 
-    def get_today_worked_hours(self) -> datetime.timedelta:
+    def _refresh_worked_hours_cache(self) -> None:
+        """Reload today's completed time and the open session from the DB."""
         today_str = datetime.date.today().isoformat()
-        completed_seconds = get_today_completed_seconds(today_str)
-        todays_hours = datetime.timedelta(seconds=completed_seconds)
+        self._cached_date = today_str
+        self._completed_today = datetime.timedelta(seconds=get_today_completed_seconds(today_str))
 
         open_rec = get_open_clocking()
-        self._is_checked_out = True
         if open_rec is not None:
             self._is_checked_out = False
             self.started_task_id = open_rec.task
-            check_in_dt = datetime.datetime.strptime(open_rec.check_in, "%Y-%m-%d %H:%M")
-            not_completed = datetime.datetime.now() - check_in_dt
-            return todays_hours + not_completed
+            self._open_check_in = datetime.datetime.strptime(open_rec.check_in, "%Y-%m-%d %H:%M")
         else:
-            return todays_hours
+            self._is_checked_out = True
+            self._open_check_in = None
+
+    def _compute_worked_hours(self) -> datetime.timedelta:
+        if self._open_check_in is None:
+            return self._completed_today
+        return self._completed_today + (datetime.datetime.now() - self._open_check_in)
 
     def warn_if_overtime(self) -> None:
         todays_hours = self.worked_hours

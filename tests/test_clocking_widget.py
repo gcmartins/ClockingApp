@@ -165,21 +165,23 @@ class TestAddRow:
 
 
 # ---------------------------------------------------------------------------
-# TestGetTodayWorkedHours
+# TestWorkedHours
 # ---------------------------------------------------------------------------
 
-class TestGetTodayWorkedHours:
+class TestWorkedHours:
     def test_empty_db_returns_zero(self, clocking_env):
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        assert widget.get_today_worked_hours() == datetime.timedelta(0)
+        widget._refresh_worked_hours_cache()
+        assert widget._compute_worked_hours() == datetime.timedelta(0)
         widget.close()
 
     def test_completed_entry_returns_correct_duration(self, clocking_env):
         save_clockings([make_clocking(TODAY, 'TASK-1', '09:00', '10:30', id=1)])
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        assert widget.get_today_worked_hours() == datetime.timedelta(hours=1, minutes=30)
+        widget._refresh_worked_hours_cache()
+        assert widget._compute_worked_hours() == datetime.timedelta(hours=1, minutes=30)
         widget.close()
 
     def test_sums_multiple_completed_entries(self, clocking_env):
@@ -189,14 +191,16 @@ class TestGetTodayWorkedHours:
         ])
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        assert widget.get_today_worked_hours() == datetime.timedelta(hours=2)
+        widget._refresh_worked_hours_cache()
+        assert widget._compute_worked_hours() == datetime.timedelta(hours=2)
         widget.close()
 
     def test_excludes_entries_from_other_days(self, clocking_env):
         save_clockings([make_clocking(YESTERDAY, 'TASK-1', '09:00', '10:00', id=1)])
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        assert widget.get_today_worked_hours() == datetime.timedelta(0)
+        widget._refresh_worked_hours_cache()
+        assert widget._compute_worked_hours() == datetime.timedelta(0)
         widget.close()
 
     def test_open_checkin_sets_is_checked_out_false(self, clocking_env):
@@ -204,7 +208,7 @@ class TestGetTodayWorkedHours:
         save_clockings([make_clocking(TODAY, 'TASK-1', '09:00', id=1)])
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        widget.get_today_worked_hours()
+        widget._refresh_worked_hours_cache()
         assert widget._is_checked_out is False
         widget.close()
 
@@ -212,7 +216,7 @@ class TestGetTodayWorkedHours:
         save_clockings([make_clocking(TODAY, 'TASK-1', '09:00', '10:00', id=1)])
         from windows.clocking import Clocking
         widget = Clocking(make_tray_icon())
-        widget.get_today_worked_hours()
+        widget._refresh_worked_hours_cache()
         assert widget._is_checked_out is True
         widget.close()
 
